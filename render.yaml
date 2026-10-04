@@ -1,0 +1,80 @@
+# Render Blueprint – Pizzeria La Scala
+#
+# Render → New → Blueprint → dieses Repository wählen.
+# Render legt den Service dann mit den Einstellungen unten an; abgefragt werden
+# nur noch die als `sync: false` markierten Geheimnisse.
+#
+# Nach dem ersten Deploy:
+#   1. Service-URL kopieren (z. B. https://lascala.onrender.com)
+#   2. In config.js window.FLUEVATE_BACKEND auf genau diese URL setzen
+#   3. Render → Connect/Outbound → Static Outbound IPs in MongoDB Atlas freigeben
+
+services:
+  - type: web
+    name: lascala
+    runtime: node
+    plan: starter
+    region: frankfurt
+    branch: main
+    buildCommand: npm install
+    startCommand: node server.js
+    # Bewusst /api/live: /api/health meldet 503, solange die Datenbank fehlt.
+    # Render wuerde den Dienst dann nie als gesund ansehen, keinen Verkehr
+    # durchlassen und 502 zeigen - die Diagnose waere unerreichbar.
+    healthCheckPath: /api/live
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: FRONTEND_URL
+        value: https://pizzerialascala.de
+
+      # ── Datenbank ──
+      - key: MONGODB_URI
+        sync: false
+
+      # ── Stripe ──
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_CONNECT_ACCOUNT
+        sync: false
+
+      # ── PayPal ──
+      - key: PAYPAL_ENV
+        value: live
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+
+      # ── E-Mail (Resend) ──
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: bestellungen@pizzerialascala.de
+      - key: RESTAURANT_EMAIL
+        sync: false
+      - key: OWNER_EMAIL
+        sync: false
+
+      # ── Zugang ──
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_TOKEN_SECRET
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+
+      # ── Sonstiges ──
+      - key: WHATSAPP_NUMBER
+        value: "4917676860269"
+      - key: STEUERNUMMER
+        sync: false
+      - key: PRINTNODE_API_KEY
+        sync: false
+      - key: PRINTNODE_PRINTER_ID
+        sync: false

@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mein Konto – Pizzeria La Scala</title>
+  <link href="fonts/fonts-account.css" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* FARBEN:START – erzeugt aus palette in stammdaten.json, nicht von Hand aendern */
+    :root {
+      --lascala-grund: #141414; --lascala-flaeche: #1e1e1f; --lascala-flaeche-2: #2a2a2c; --lascala-rahmen: #3d3d40;
+      --lascala-schrift: #f4f1ec; --lascala-schrift-leise: #b5b0a8;
+      --lascala-akzent: #d32027; --lascala-akzent-2: #2a7d34; --lascala-auf-akzent: #ffffff;
+      --lascala-rot: #ef5350; --lascala-gruen: #66bb6a;
+      /* Namen aus der Vorlage, damit vorhandenes var(...) weiter traegt */
+      --lascala-blue: var(--lascala-akzent); --lascala-gold: var(--lascala-akzent);
+      --lascala-red: var(--lascala-rot);
+      --text-dark: var(--lascala-schrift); --bg-light: var(--lascala-flaeche);
+    }
+    body { background: var(--lascala-grund); color: var(--lascala-schrift); }
+    /* FARBEN:ENDE */
+    :root {
+      --red:    var(--lascala-rot);
+      --red2:   #6b1515;
+      --gold:   var(--lascala-akzent);
+      --cream:  var(--lascala-schrift);
+      --text:   var(--lascala-schrift);
+      --muted:  var(--lascala-akzent);
+      --border: var(--lascala-rahmen);
+      --white:  var(--lascala-schrift);
+      --green:  var(--lascala-gruen);
+      --radius: 12px;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--lascala-flaeche);
+      color: var(--lascala-schrift);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--lascala-flaeche);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header a { text-decoration: none; display: flex; align-items: center; gap: 10px; }
+    .header-logo { font-family: 'Playfair Display', serif; color: var(--lascala-schrift); font-size: 22px; }
+    .header-logo span { color: var(--lascala-akzent); }
+    .header-back { color: rgba(255,255,255,0.8); font-size: 14px; display: flex; align-items: center; gap: 6px; }
+    .header-back:hover { color: var(--lascala-schrift); }
+
+    /* ── Container ── */
+    .container { max-width: 720px; margin: 0 auto; padding: 32px 16px 60px; }
+
+    /* ── Auth Section ── */
+    #auth-section { display: block; }
+    #dashboard-section { display: none; }
+
+    .auth-card {
+      background: var(--lascala-flaeche);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .auth-tabs {
+      display: flex;
+      border-bottom: 2px solid var(--lascala-rahmen);
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 16px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      color: var(--lascala-akzent);
+      border: none;
+      background: transparent;
+      transition: color 0.2s;
+    }
+    .auth-tab.active {
+      color: var(--lascala-rot);
+      border-bottom: 2px solid var(--lascala-rot);
+      margin-bottom: -2px;
+    }
+
+    .auth-form { padding: 28px 28px 32px; display: none; }
+    .auth-form.active { display: block; }
+
+    .auth-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+    .auth-subtitle { color: var(--lascala-akzent); font-size: 14px; margin-bottom: 24px; }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 480px) { .field-row { grid-template-columns: 1fr; } }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: var(--lascala-schrift); }
+    .field input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--lascala-rahmen);
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: 'DM Sans', sans-serif;
+      background: var(--lascala-flaeche);
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    .field input:focus { border-color: var(--lascala-rot); background: var(--lascala-flaeche); }
+
+    .btn {
+      width: 100%;
+      padding: 13px;
+      background: var(--lascala-akzent-2);
+      color: var(--lascala-schrift);
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 6px;
+    }
+    .btn:hover { background: var(--lascala-akzent-2); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-secondary {
+      background: transparent;
+      color: var(--lascala-rot);
+      border: 1.5px solid var(--lascala-rot);
+    }
+    .btn-secondary:hover { background: var(--lascala-akzent-2); color: var(--lascala-schrift); }
+    .btn-sm {
+      width: auto;
+      padding: 8px 16px;
+      font-size: 13px;
+      margin-top: 0;
+    }
+
+    .error-msg {
+      background: var(--lascala-flaeche);
+      border: 1px solid var(--lascala-rot);
+      color: var(--lascala-rot);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+    .success-msg {
+      background: var(--lascala-flaeche);
+      border: 1px solid var(--lascala-gruen);
+      color: var(--lascala-gruen);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .success-msg.show { display: block; }
+
+    /* ── Dashboard ── */
+    .dashboard-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .dashboard-title { font-family: 'Playfair Display', serif; font-size: 26px; }
+    .dashboard-user { font-size: 14px; color: var(--lascala-akzent); margin-top: 2px; }
+    .logout-btn {
+      background: transparent;
+      border: 1.5px solid var(--lascala-rahmen);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--lascala-akzent);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .logout-btn:hover { border-color: var(--lascala-rot); color: var(--lascala-rot); }
+
+    .dash-tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 2px solid var(--lascala-rahmen);
+      margin-bottom: 24px;
+    }
+    .dash-tab {
+      padding: 11px 18px;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--lascala-akzent);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.2s;
+    }
+    .dash-tab.active { color: var(--lascala-rot); border-bottom-color: var(--lascala-rot); }
+
+    .dash-panel { display: none; }
+    .dash-panel.active { display: block; }
+
+    /* ── Order Cards ── */
+    .orders-list { display: flex; flex-direction: column; gap: 12px; }
+    .order-card {
+      background: var(--lascala-flaeche);
+      border: 1.5px solid var(--lascala-rahmen);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .order-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--lascala-rahmen);
+      background: var(--lascala-flaeche);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .order-num { font-weight: 700; font-size: 15px; }
+    .order-date { font-size: 12px; color: var(--lascala-akzent); }
+    .order-mode { font-size: 12px; color: var(--lascala-akzent); background: var(--lascala-flaeche-2); border-radius: 20px; padding: 3px 10px; }
+
+    .status-badge {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+    .status-pending    { background: var(--lascala-flaeche); color: var(--lascala-akzent); }
+    .status-confirmed  { background: var(--lascala-flaeche-2); color: var(--lascala-akzent); }
+    .status-preparing  { background: var(--lascala-flaeche); color: var(--lascala-akzent); }
+    .status-ready      { background: var(--lascala-flaeche-2); color: var(--lascala-gruen); }
+    .status-delivered  { background: var(--lascala-flaeche); color: var(--lascala-gruen); }
+    .status-cancelled  { background: var(--lascala-flaeche-2); color: var(--lascala-rot); }
+    .status-awaiting_payment { background: var(--lascala-flaeche-2); color: var(--lascala-akzent); }
+
+    .order-card-body { padding: 14px 18px; }
+    .order-items { list-style: none; margin-bottom: 12px; }
+    .order-items li { font-size: 14px; padding: 3px 0; color: var(--lascala-schrift); }
+    .order-items li::before { content: '•'; margin-right: 8px; color: var(--lascala-akzent); }
+
+    .order-card-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      border-top: 1px solid var(--lascala-rahmen);
+      background: var(--lascala-flaeche);
+    }
+    .order-total { font-weight: 700; font-size: 17px; }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--lascala-akzent);
+    }
+    .empty-state p { margin-top: 8px; font-size: 14px; }
+
+    /* ── Profil ── */
+    .profile-card {
+      background: var(--lascala-flaeche);
+      border: 1.5px solid var(--lascala-rahmen);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .section-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--lascala-rahmen);
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: var(--lascala-rahmen);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-state { text-align: center; padding: 32px; color: var(--lascala-akzent); font-size: 14px; }
+  </style>
+  <!-- Zentrale Backend-Adresse, muss vor allen anderen Skripten stehen -->
+  <script src="config.js"></script>
+</head>
+<body>
+
+<div class="header">
+  <a href="index.html">
+    <span class="header-logo">Pizzeria <span>La Scala</span></span>
+  </a>
+  <a href="index.html" class="header-back">← Zurück zur Speisekarte</a>
+</div>
+
+<div class="container">
+
+  <!-- ═══════════════ AUTH SECTION ═══════════════ -->
+  <div id="auth-section">
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchAuthTab('login')">Anmelden</button>
+        <button class="auth-tab" onclick="switchAuthTab('register')">Registrieren</button>
+      </div>
+
+      <!-- Login Form -->
+      <form class="auth-form active" id="login-form" onsubmit="handleLogin(event)">
+        <h1 class="auth-title">Willkommen zurück</h1>
+        <p class="auth-subtitle">Melde dich an und verwalte deine Bestellungen.</p>
+        <div class="error-msg" id="login-error"></div>
+        <div class="field">
+          <label>E-Mail-Adresse</label>
+          <input type="email" id="login-email" placeholder="deine@email.de" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label>Passwort</label>
+          <input type="password" id="login-password" placeholder="Passwort" required autocomplete="current-password">
+        </div>
+        <button class="btn" type="submit" id="login-btn">Anmelden</button>
+      </form>
+
+      <!-- Register Form -->
+      <form class="auth-form" id="register-form" onsubmit="handleRegister(event)">
+        <h1 class="auth-title">Konto erstellen</h1>
+        <p class="auth-subtitle">Registriere dich für schnelleres Bestellen und Bestellhistorie.</p>
+        <div class="error-msg" id="register-error"></div>
+        <div class="field-row">
+          <div class="field">
+            <label>Vorname</label>
+            <input type="text" id="reg-first" placeholder="Max" required autocomplete="given-name">
+          </div>
+          <div class="field">
+            <label>Nachname</label>
+            <input type="text" id="reg-last" placeholder="Mustermann" required autocomplete="family-name">
+          </div>
+        </div>
+        <div class="field">
+          <label>E-Mail-Adresse</label>
+          <input type="email" id="reg-email" placeholder="deine@email.de" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label>Passwort <span style="color:var(--lascala-akzent);font-weight:400;">(mindestens 6 Zeichen)</span></label>
+          <input type="password" id="reg-password" placeholder="Passwort" required autocomplete="new-password" minlength="6">
+        </div>
+        <div class="field">
+          <label>Telefon</label>
+          <input type="tel" id="reg-phone" placeholder="+49 152 123456" required autocomplete="tel">
+        </div>
+        <div class="field" style="margin-bottom:18px;">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-weight:400;">
+            <input type="checkbox" id="reg-datenschutz" required style="width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:var(--lascala-akzent);">
+            <span style="font-size:13px;color:var(--lascala-akzent);line-height:1.5;">
+              Ich habe die <button type="button" onclick="openDatenschutz()" style="background:none;border:none;color:var(--lascala-rot);font-weight:600;cursor:pointer;font-size:13px;padding:0;text-decoration:underline;">Datenschutzerklärung</button> gelesen und stimme der Verarbeitung meiner Daten zur Kontoerstellung und Bestellabwicklung zu (DSGVO Art. 6 Abs. 1 lit. b).
+            </span>
+          </label>
+        </div>
+        <button class="btn" type="submit" id="register-btn">Konto erstellen</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DASHBOARD SECTION ═══════════════ -->
+  <div id="dashboard-section">
+    <div class="dashboard-header">
+      <div>
+        <h1 class="dashboard-title">Mein Konto</h1>
+        <p class="dashboard-user" id="dash-user-name"></p>
+      </div>
+      <button class="logout-btn" onclick="logout()">Abmelden</button>
+    </div>
+
+    <div class="dash-tabs">
+      <button class="dash-tab active" onclick="switchDashTab('orders')">Bestellungen</button>
+      <button class="dash-tab" onclick="switchDashTab('profile')">Profil</button>
+      <button class="dash-tab" onclick="switchDashTab('password')">Passwort</button>
+    </div>
+
+    <!-- Panel: Bestellhistorie -->
+    <div class="dash-panel active" id="panel-orders">
+      <div id="orders-container">
+        <div class="loading-state">Bestellungen werden geladen…</div>
+      </div>
+    </div>
+
+    <!-- Panel: Profil -->
+    <div class="dash-panel" id="panel-profile">
+      <div class="profile-card">
+        <h2 class="section-title">Persönliche Daten</h2>
+        <div class="error-msg" id="profile-error"></div>
+        <div class="success-msg" id="profile-success"></div>
+        <form onsubmit="handleProfileSave(event)">
+          <div class="field-row">
+            <div class="field">
+              <label>Vorname</label>
+              <input type="text" id="prof-first" required>
+            </div>
+            <div class="field">
+              <label>Nachname</label>
+              <input type="text" id="prof-last" required>
+            </div>
+          </div>
+          <div class="field">
+            <label>E-Mail</label>
+            <input type="email" id="prof-email" disabled style="opacity:0.6;cursor:not-allowed;">
+          </div>
+          <div class="field">
+            <label>Telefon</label>
+            <input type="tel" id="prof-phone" placeholder="+49 152 123456">
+          </div>
+          <button class="btn" type="submit" id="profile-btn">Änderungen speichern</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Panel: Passwort -->
+    <div class="dash-panel" id="panel-password">
+      <div class="profile-card">
+        <h2 class="section-title">Passwort ändern</h2>
+        <div class="error-msg" id="pw-error"></div>
+        <div class="success-msg" id="pw-success"></div>
+        <form onsubmit="handlePasswordChange(event)">
+          <div class="field">
+            <label>Aktuelles Passwort</label>
+            <input type="password" id="pw-current" required autocomplete="current-password">
+          </div>
+          <div class="field">
+            <label>Neues Passwort</label>
+            <input type="password" id="pw-new" required minlength="6" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label>Neues Passwort bestätigen</label>
+            <input type="password" id="pw-confirm" required autocomplete="new-password">
+          </div>
+          <button class="btn" type="submit" id="pw-btn">Passwort ändern</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── API-URL ───────────────────────────────────────────────────
+  // Das Frontend läuft auf GitHub Pages (pizzerialascala.de), das Backend
+  // getrennt auf Render. Deshalb absolute Backend-URL (wie in dashboard.html).
+  const API = window.FLUEVATE_BACKEND;   // siehe config.js
+// Faellt config.js aus (nicht mitdeployt, lokal per file:// geblockt), waere
+// die Backend-Adresse undefined und jeder Aufruf ginge ins Leere – mit einer
+// Fehlermeldung, die niemand deuten kann. Lieber sofort deutlich sagen.
+if (!window.FLUEVATE_BACKEND) {
+  console.error('config.js wurde nicht geladen – window.FLUEVATE_BACKEND fehlt.');
+  document.addEventListener('DOMContentLoaded', function() {
+    var b = document.createElement('div');
+    b.textContent = 'Konfigurationsfehler: config.js konnte nicht geladen werden. '
+                  + 'Bestellungen und Anmeldung funktionieren gerade nicht.';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:var(--lascala-akzent-2);'
+                    + 'color:var(--lascala-schrift);padding:10px 14px;font:600 14px/1.4 sans-serif;text-align:center;';
+    document.body.appendChild(b);
+  });
+}
+
+  // ── Token-Management ─────────────────────────────────────────
+  const getToken  = () => localStorage.getItem('customerToken');
+  const setToken  = t  => localStorage.setItem('customerToken', t);
+  const clearToken = () => localStorage.removeItem('customerToken');
+  const authHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${getToken()}`
+  });
+
+  // ── Fehlertext ───────────────────────────────────────────────
+  // Erreicht fetch den Server nicht, wirft es einen TypeError – Safari nennt
+  // ihn "Load failed", Chrome "Failed to fetch". Für einen Gast ist das
+  // bedeutungslos. Fachliche Meldungen vom Server sind bereits auf Deutsch
+  // und werden unverändert durchgereicht.
+  function fehlerText(err) {
+    if (err instanceof TypeError || !err.message) {
+      return 'Verbindung zum Server fehlgeschlagen. Bitte Internetverbindung '
+           + 'prüfen und die Seite neu laden (Cache leeren).';
+    }
+    return err.message;
+  }
+
+  // Antwort einlesen und dabei den Fall abfangen, dass gar kein JSON kommt.
+  // Das passiert, wenn nicht der Server antwortet, sondern etwas dazwischen:
+  // eine HTML-Fehlerseite, die Sperrseite eines Werbe-/Netzfilters oder eine
+  // Wartungsseite. Safari meldet das sonst nur als
+  // "The string did not match the expected pattern." – ohne jeden Hinweis.
+  async function antwortLesen(res) {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      const artUndWeise = (res.headers.get('content-type') || 'unbekannt').split(';')[0];
+      throw new Error('Unerwartete Antwort vom Server (HTTP ' + res.status
+        + ', ' + artUndWeise + '). Nicht der Server hat geantwortet, sondern '
+        + 'etwas dazwischen – z.B. ein Netzfilter oder eine Fehlerseite.');
+    }
+  }
+
+  init();   // erst hier – getToken/authHeaders sind oben als const deklariert
+
+  // ── Init ─────────────────────────────────────────────────────
+  async function init() {
+    const token = getToken();
+    if (!token) return showAuth();
+    try {
+      const res = await fetch(`${API}/api/auth/me`, { headers: authHeaders() });
+      if (!res.ok) throw new Error();
+      const user = await antwortLesen(res);
+      showDashboard(user);
+    } catch {
+      clearToken();
+      showAuth();
+    }
+  }
+
+  function showAuth() {
+    document.getElementById('auth-section').style.display = 'block';
+    document.getElementById('dashboard-section').style.display = 'none';
+  }
+
+  function showDashboard(user) {
+    document.getElementById('auth-section').style.display = 'none';
+    document.getElementById('dashboard-section').style.display = 'block';
+    document.getElementById('dash-user-name').textContent = `${user.first} ${user.last} · ${user.email}`;
+    // Profil-Felder befüllen
+    document.getElementById('prof-first').value = user.first || '';
+    document.getElementById('prof-last').value  = user.last  || '';
+    document.getElementById('prof-email').value = user.email || '';
+    document.getElementById('prof-phone').value = user.phone || '';
+    // Bestellungen laden
+    loadOrders();
+  }
+
+  // ── Auth Tabs ────────────────────────────────────────────────
+  function switchAuthTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach((t, i) => {
+      t.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'register'));
+    });
+    document.getElementById('login-form').classList.toggle('active', tab === 'login');
+    document.getElementById('register-form').classList.toggle('active', tab === 'register');
+  }
+
+  // ── Login ────────────────────────────────────────────────────
+  async function handleLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    const errEl = document.getElementById('login-error');
+    errEl.classList.remove('show');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Anmelden…';
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email:    document.getElementById('login-email').value.trim(),
+          password: document.getElementById('login-password').value
+        })
+      });
+      const data = await antwortLesen(res);
+      if (!res.ok) throw new Error(data.message || 'Fehler');
+      setToken(data.token);
+      showDashboard(data.user);
+    } catch (err) {
+      errEl.textContent = fehlerText(err);
+      errEl.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Anmelden';
+    }
+  }
+
+  // ── Register ─────────────────────────────────────────────────
+  async function handleRegister(e) {
+    e.preventDefault();
+    const btn = document.getElementById('register-btn');
+    const errEl = document.getElementById('register-error');
+    errEl.classList.remove('show');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Konto erstellen…';
+    try {
+      const res = await fetch(`${API}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email:    document.getElementById('reg-email').value.trim(),
+          password: document.getElementById('reg-password').value,
+          first:    document.getElementById('reg-first').value.trim(),
+          last:     document.getElementById('reg-last').value.trim(),
+          phone:    document.getElementById('reg-phone').value.trim()
+        })
+      });
+      const data = await antwortLesen(res);
+      if (!res.ok) throw new Error(data.message || 'Fehler');
+      setToken(data.token);
+      showDashboard(data.user);
+    } catch (err) {
+      errEl.textContent = fehlerText(err);
+      errEl.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Konto erstellen';
+    }
+  }
+
+  // ── Dashboard Tabs ───────────────────────────────────────────
+  function switchDashTab(tab) {
+    document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.dash-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector(`.dash-tab[onclick*="${tab}"]`).classList.add('active');
+    document.getElementById(`panel-${tab}`).classList.add('active');
+  }
+
+  // ── Bestellhistorie ──────────────────────────────────────────
+  async function loadOrders() {
+    const container = document.getElementById('orders-container');
+    try {
+      const res = await fetch(`${API}/api/account/orders`, { headers: authHeaders() });
+      if (!res.ok) throw new Error();
+      const orders = await antwortLesen(res);
+      container.innerHTML = renderOrders(orders);
+    } catch {
+      container.innerHTML = '<div class="loading-state">Bestellungen konnten nicht geladen werden.</div>';
+    }
+  }
+
+  function renderOrders(orders) {
+    if (!orders.length) {
+      return `<div class="empty-state">
+        <div style="font-size:48px;">🍕</div>
+        <p>Du hast noch keine Bestellungen.</p>
+        <p style="margin-top:16px;"><a href="index.html" style="color:var(--lascala-rot);font-weight:600;">Jetzt bestellen →</a></p>
+      </div>`;
+    }
+    return `<div class="orders-list">${orders.map(o => `
+      <div class="order-card">
+        <div class="order-card-head">
+          <span class="order-num">Bestellung #${o.orderNum}</span>
+          <span class="order-mode">${o.mode === 'lieferung' ? '🛵 Lieferung' : '🏪 Abholung'}</span>
+          <span class="status-badge status-${o.status}">${statusLabel(o.status)}</span>
+          <span class="order-date">${new Date(o.createdAt).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' })}</span>
+        </div>
+        <div class="order-card-body">
+          <ul class="order-items">
+            ${o.items.map(i => `<li>${i.qty}× ${i.name}${i.note ? ' <span style="color:var(--lascala-akzent);font-size:12px;">(${i.note})</span>' : ''}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="order-card-foot">
+          <span class="order-total">${(o.total || 0).toFixed(2)} €</span>
+          <button class="btn btn-sm btn-secondary" onclick="reorder('${o._id}')">↺ Erneut bestellen</button>
+        </div>
+      </div>
+    `).join('')}</div>`;
+  }
+
+  function statusLabel(s) {
+    const map = {
+      pending:          'Ausstehend',
+      confirmed:        'Bestätigt',
+      preparing:        'In Zubereitung',
+      ready:            'Fertig',
+      delivered:        'Geliefert',
+      cancelled:        'Storniert',
+      awaiting_payment: 'Zahlung ausstehend'
+    };
+    return map[s] || s;
+  }
+
+  // ── Re-Order ─────────────────────────────────────────────────
+  async function reorder(orderId) {
+    try {
+      const res = await fetch(`${API}/api/account/reorder/${orderId}`, {
+        method: 'POST',
+        headers: authHeaders()
+      });
+      const data = await antwortLesen(res);
+      if (!res.ok) throw new Error(data.message);
+      localStorage.setItem('reorderItems', JSON.stringify(data.items));
+      localStorage.setItem('reorderMode', data.mode);
+      window.location.href = 'index.html#warenkorb';
+    } catch (err) {
+      alert('Re-Order fehlgeschlagen: ' + fehlerText(err));
+    }
+  }
+
+  // ── Profil speichern ─────────────────────────────────────────
+  async function handleProfileSave(e) {
+    e.preventDefault();
+    const btn     = document.getElementById('profile-btn');
+    const errEl   = document.getElementById('profile-error');
+    const succEl  = document.getElementById('profile-success');
+    errEl.classList.remove('show');
+    succEl.classList.remove('show');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Speichern…';
+    try {
+      const res = await fetch(`${API}/api/auth/profile`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          first: document.getElementById('prof-first').value.trim(),
+          last:  document.getElementById('prof-last').value.trim(),
+          phone: document.getElementById('prof-phone').value.trim()
+        })
+      });
+      const data = await antwortLesen(res);
+      if (!res.ok) throw new Error(data.message);
+      document.getElementById('dash-user-name').textContent = `${data.first} ${data.last} · ${data.email}`;
+      succEl.textContent = 'Profil erfolgreich gespeichert.';
+      succEl.classList.add('show');
+    } catch (err) {
+      errEl.textContent = fehlerText(err);
+      errEl.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Änderungen speichern';
+    }
+  }
+
+  // ── Passwort ändern ──────────────────────────────────────────
+  async function handlePasswordChange(e) {
+    e.preventDefault();
+    const btn    = document.getElementById('pw-btn');
+    const errEl  = document.getElementById('pw-error');
+    const succEl = document.getElementById('pw-success');
+    errEl.classList.remove('show');
+    succEl.classList.remove('show');
+
+    const newPw     = document.getElementById('pw-new').value;
+    const confirmPw = document.getElementById('pw-confirm').value;
+    if (newPw !== confirmPw) {
+      errEl.textContent = 'Neue Passwörter stimmen nicht überein.';
+      errEl.classList.add('show');
+      return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Ändern…';
+    try {
+      const res = await fetch(`${API}/api/auth/password`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          currentPassword: document.getElementById('pw-current').value,
+          newPassword: newPw
+        })
+      });
+      const data = await antwortLesen(res);
+      if (!res.ok) throw new Error(data.message);
+      succEl.textContent = 'Passwort erfolgreich geändert.';
+      succEl.classList.add('show');
+      e.target.reset();
+    } catch (err) {
+      errEl.textContent = fehlerText(err);
+      errEl.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Passwort ändern';
+    }
+  }
+
+  // ── Datenschutz Modal ────────────────────────────────────────
+  function openDatenschutz() {
+    document.getElementById('datenschutzModal').style.display = 'flex';
+  }
+  function closeDatenschutz() {
+    document.getElementById('datenschutzModal').style.display = 'none';
+  }
+
+  // ── Logout ───────────────────────────────────────────────────
+  function logout() {
+    clearToken();
+    showAuth();
+    // Formulare leeren
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
+    switchAuthTab('login');
+  }
+</script>
+
+<!-- Datenschutz Modal -->
+<div id="datenschutzModal" onclick="if(event.target===this)closeDatenschutz()"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--lascala-flaeche);border-radius:16px;width:100%;max-width:600px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+    <div style="background:var(--lascala-flaeche);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <span style="color:var(--lascala-schrift);font-weight:700;font-size:1rem;">🔒 Datenschutzerklärung</span>
+      <button type="button" onclick="closeDatenschutz()" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;width:32px;height:32px;color:var(--lascala-schrift);font-size:1rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="overflow-y:auto;padding:24px;font-size:14px;line-height:1.7;color:var(--lascala-schrift);">
+      <h3 style="color:var(--lascala-rot);margin:0 0 14px;">Datenschutz (DSGVO)</h3>
+      <h4 style="color:var(--lascala-rot);margin:0 0 6px;font-size:.92rem;">1. Verantwortlicher</h4>
+      <p>Pizzeria La Scala · Ludgeristraße 62 · 59379 Selm<br>Tel: 0 25 92 / 9 78 93 30 · info@pizzerialascala.de</p>
+      <h4 style="color:var(--lascala-rot);margin:16px 0 6px;font-size:.92rem;">2. Erhobene Daten bei Kontoerstellung</h4>
+      <ul style="margin:6px 0 8px 18px;color:var(--lascala-schrift);line-height:1.85;">
+        <li>Vor- und Nachname, Telefonnummer</li>
+        <li>E-Mail-Adresse</li>
+        <li>Bestelldaten, Zahlungsart, Zeitstempel</li>
+      </ul>
+      <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung)</p>
+      <p><strong>Speicherdauer:</strong> Bestelldaten 10 Jahre (§ 147 AO) · Kontodaten bis zur Löschung</p>
+      <h4 style="color:var(--lascala-rot);margin:16px 0 6px;font-size:.92rem;">3. Eingesetzte Dienstleister</h4>
+      <ul style="margin:6px 0 8px 18px;color:var(--lascala-schrift);line-height:1.85;">
+        <li><strong>Stripe Payments Europe Ltd.</strong> – Zahlungsabwicklung</li>
+        <li><strong>Resend Inc.</strong> – E-Mail-Versand</li>
+        <li><strong>MongoDB Atlas</strong> – Datenbankhosting (Server EU/Frankfurt)</li>
+      </ul>
+      <h4 style="color:var(--lascala-rot);margin:16px 0 6px;font-size:.92rem;">4. Ihre Rechte (Art. 15–22 DSGVO)</h4>
+      <p>Auskunft · Berichtigung · Löschung · Einschränkung · Widerspruch · Datenübertragbarkeit<br>
+      Kontakt: info@pizzerialascala.de</p>
+      <p style="margin-top:18px;font-size:.73rem;color:var(--lascala-schrift-leise);">Stand: März 2026</p>
+    </div>
+    <div style="padding:16px 20px;border-top:1px solid var(--lascala-rahmen);flex-shrink:0;">
+      <button type="button" onclick="closeDatenschutz()" class="btn">Verstanden &amp; schließen</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

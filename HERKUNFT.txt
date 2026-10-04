@@ -1,0 +1,2 @@
+Abstammung: d8d116e 2026-10-03 CCM19 Consent-Banner in Bestellseite und Kundenkonto einbinden
+Vorlage:    ~/dev/gastronomie/PinocchioNordkirchen (sauberer Checkout von d8d116e; die offene Footer-Aenderung ohne Emojis ist nicht enthalten)

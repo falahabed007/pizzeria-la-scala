@@ -1,0 +1,292 @@
+@quelle	Gedruckte Karte Pizzeria La Scala, Selm, Ludgeristraße 62 (PDF-Scan, 6 Seiten), eingelesen am 4.10.2026
+@hinweis	Namen gleichlautender Gerichte (Napoli, Bolognese, Quattro Formaggi, Hollandaise-Pizzen, Perfecto, Hähnchengeschnetzeltes, Cordon bleu, Salate klein/groß) wurden um die Kategorie bzw. Zutat ergänzt, weil der Ausverkauft-Schalter eindeutige Artikelnamen braucht. Salate mit klein/groß sind je zwei Artikel mit gleicher Nummer. Sucuk statt gedrucktem Susuk (Baguette 47). 159 Bomba nur ein Preis (15 €, 2 Personen) und deshalb eigene Kategorie. Aktionen und Pakete der Karte (Mittagsangebot, Wochentagsaktionen, Pizzablech, Party-Pakete) stehen nicht in menu.json. Getränke stehen auf der Karte nicht.
+@pos_start	pizza
+@groessen	mini=20 cm	normal=26 cm	maxi=32 cm
+@extras	mini=0.5	normal=1	maxi=1.5
+@extras_hinweis	Jeder weitere Belag 0,50 / 1,00 / 1,50 € laut gedruckter Karte (klein/norm./maxi)
+# vorspeisen	Antipasti und Delikatessen	simple
+10	Calabrese	Mozzarella, Tomaten, Basilikum	7
+11	Bruschetta	hausgemachtes Brot, Tomaten, Zwiebeln, Petersilie und Knoblauch, überbacken	5
+12	Bruschetta Sicilian	Fetakäse, frische Tomaten, Zwiebeln, Sardellen	5
+13	Gemüse-Platte	gebratene Aubergine, Zucchini, Paprikastreifen	7
+14	Fetakäse-Teller	Peperoni (mild), Oliven und Olivenöl	7
+15	Überbackene Aubergine	Tomaten-Sahnesauce, Knoblauch und Käse überbacken	7
+16	Überbackene Champignons		7
+17	Lachscarpaccio	Lachsfilet mit Rucola und Parmesan	7
+18	Italienisches Brot	mit Knoblauch	4
+19	Italienische Vorspeise	für 2 Personen	14
+# teigtaschen	Teigtaschen	simple
+25	Käsetasche		4
+26	Spinattasche	Spinat, Käse	4
+27	Tonnotasche	Thunfisch, Käse	4
+28	Hackfleischtasche	Hackfleisch und Zwiebeln	5
+# pizzabroetchen	Gefüllte Pizzabrötchen	simple
+29	Pizzabrötchen Käse / Salami / Schinken / Thunfisch oder Hawaii	nach Wahl	5
+30	Pizzabrötchen Krabben und Knoblauch		6
+31	Pizzabrötchen Sardellen und Kapern	scharf	6
+32	Pizzabrötchen Hackfleisch, Zwiebeln		6
+33	Pizzabrötchen Dönerfleisch und Zwiebeln		6
+34	Pizzabrötchen Sucuk und Zwiebeln		6
+	Portion Pizzabrötchen	mit Kräutercreme oder Knoblauchcreme	3
+# baguettes	Ofenfrische Baguettes	simple
+40	Baguette Tonno	Eisberg, fr. Tomaten, Thunfisch, Zwiebeln, Remoulade, Käse, überbacken	6.5
+41	Baguette Prosciutto	Eisberg, Schinken, Ananas, Remoulade, Käse überbacken	6.5
+42	Baguette Prosciutto-Salami	Eisbergsalat, Schinken, Salami, Remoulade, Käse überbacken	6.5
+43	Baguette Lachs	Eisbergsalat, geräucherter Lachs, frische Tomaten, Senf, Remoulade, gekochtes Ei	6.5
+44	Baguette Gambari	Eisbergsalat, Krabben, Mayonnaise, Ananas, Käse überbacken	6.5
+45	Baguette Vegetaria	Spinat, Broccoli, frische Champignons	6.5
+46	Baguette Feta	Fetakäse, Tomaten, Gurken, Salat, fr. Paprika	6.5
+47	Baguette Sucuk	Eisbergsalat, Remoulade, Tomaten, Zwiebeln	6.5
+48	Baguette Döner	Eisbergsalat, Remoulade, Tomaten, Zwiebeln	6.5
+# salate	Insalate - Salate	simple
+55	Mista klein	Eisberg, Tomaten, Gurken, Mais	4
+55	Mista groß	Eisberg, Tomaten, Gurken, Mais	6
+56	Rucola	Rucola, Champignons, Mozzarella, Olivenöl und Zitrone	7.5
+57	Verde klein	grüner Salat	4
+57	Verde groß	grüner Salat	6
+58	Di Pomodore con Cipolla klein	Tomatensalat mit Zwiebeln	5
+58	Di Pomodore con Cipolla groß	Tomatensalat mit Zwiebeln	7
+59	Prosciutto Formaggi klein	Eisbergsalat, Tomaten, Gurken, Mais, Käse, Schinken	5.5
+59	Prosciutto Formaggi groß	Eisbergsalat, Tomaten, Gurken, Mais, Käse, Schinken	8
+60	Tonno con Cipolla klein	Eisbergsalat, Tomaten, Gurken, Mais, Thunfisch, Zwiebeln	5.5
+60	Tonno con Cipolla groß	Eisbergsalat, Tomaten, Gurken, Mais, Thunfisch, Zwiebeln	8
+61	Salat Quattro Formaggi klein	Eisbergsalat, Tomaten, Gurken, Mais, Gouda, Gorgonzola, Mozzarella, Schafskäse, schwarze Oliven	7
+61	Salat Quattro Formaggi groß	Eisbergsalat, Tomaten, Gurken, Mais, Gouda, Gorgonzola, Mozzarella, Schafskäse, schwarze Oliven	9
+62	Gambari klein	Eisbergsalat, Tomaten, Gurken, Mais, Krabben, Zwiebeln, Peperoni	7
+62	Gambari groß	Eisbergsalat, Tomaten, Gurken, Mais, Krabben, Zwiebeln, Peperoni	9
+63	La Scala klein	Eisbergsalat, Tomaten, Gurken, Mais, Schinken, Thunfisch, Käse, Ei, Oliven, Paprika, Peperoni	7
+63	La Scala groß	Eisbergsalat, Tomaten, Gurken, Mais, Schinken, Thunfisch, Käse, Ei, Oliven, Paprika, Peperoni	9
+64	Con Polio klein	Eisbergsalat, Tomaten, Gurken, Mais, Paprika, Oliven, Ei, Ananas, Hähnchenbrustfiletstreifen, Peperoni	7
+64	Con Polio groß	Eisbergsalat, Tomaten, Gurken, Mais, Paprika, Oliven, Ei, Ananas, Hähnchenbrustfiletstreifen, Peperoni	9
+65	Spezial-Salat klein	Eisbergsalat, Tomaten, Gurken, Mais, Thunfisch, Ei, Schinken, Käse, Ananas, Artischocken, Spargel, Oliven, Peperoni	7
+65	Spezial-Salat groß	Eisbergsalat, Tomaten, Gurken, Mais, Thunfisch, Ei, Schinken, Käse, Ananas, Artischocken, Spargel, Oliven, Peperoni	9
+66	Insalata di Mare klein	Eisbergsalat, Tomaten, Gurken, Mais und Meeresfrüchte	7
+66	Insalata di Mare groß	Eisbergsalat, Tomaten, Gurken, Mais und Meeresfrüchte	9
+67	Insalata Salmone klein	Rucola, Lachs, Krabben, Paprika, Tomaten und Ei	7
+67	Insalata Salmone groß	Rucola, Lachs, Krabben, Paprika, Tomaten und Ei	9
+68	Chefsalat Rucola klein	Hähnchenbruststreifen, Rucola, Champignons, Tomaten und fr. Parmesan	7
+68	Chefsalat Rucola groß	Hähnchenbruststreifen, Rucola, Champignons, Tomaten und fr. Parmesan	9
+69	Insalata Nano klein	Eisbergsalat, Tomaten, Gurken, Mais, Sucuk, Paprika, Peperoni	7
+69	Insalata Nano groß	Eisbergsalat, Tomaten, Gurken, Mais, Sucuk, Paprika, Peperoni	9
+70	Insalata Selm klein	Tomaten, Gurken, Mais, Paprika, Peperoni, Zwiebeln, Dönerfleisch	7
+70	Insalata Selm groß	Tomaten, Gurken, Mais, Paprika, Peperoni, Zwiebeln, Dönerfleisch	9
+# pizza	Pizza	pizza	note=Alle Pizzen mit Tomatensauce und Gouda-Käse
+80	Margherita		4	6	8
+81	Cipolla	Zwiebeln	5	7.5	8.5
+82	Funghi	frische Champignons	5	7.5	8.5
+83	Salami		5	7.5	8.5
+84	Prosciutto	Schinken	5	7.5	8.5
+85	Peperoni	Paprika	5	7.5	8.5
+86	Tonno	Thunfisch	5	8	9.5
+87	Laila	Thunfisch, Zwiebeln	5	8	9.5
+88	Lolita	frische Champignons, Thunfisch	5	8	9.5
+89	Gamberetti	Krabben, Knoblauch	6	8.5	10
+90	Roma	Muscheln, Krabben	6	8.5	10
+91	Frutti di Mare	Thunfisch, Krabben, Meeresfrüchte, Knoblauch	6	8.5	10
+92	Prosciutto Salami	Schinken, Salami	5.5	8	9.5
+93	Prosciutto Funghi	Schinken, frische Champignons	5.5	8	9.5
+94	Salami Funghi	Salami, frische Champignons	5.5	8	9.5
+95	Hawaii	Schinken, Ananas	5.5	8	9.5
+96	Spinaci	Blattspinat, Knoblauch	5.5	8	9.5
+97	Broccoli	Broccoli, Knoblauch	5.5	8	9.5
+98	Italia	Salami, Schinken, frische Champignons	6	8.5	10
+99	Vegetarian	Broccoli, Paprika, Zwiebeln, Artischocken, Spinat, Oliven	6	8.5	10
+100	Capricciosa	Salami, Schinken, frische Champignons, Paprika, Artischocken	6	8.5	10
+101	Bella Roma	Sardellen, frische Tomaten, Oliven, Peperoni, scharf	6	8.5	10
+102	Quattro Stagione	Salami, Schinken, Thunfisch, frische Champignons	6	8.5	10
+103	Quattro Formaggi	vier verschiedene Käsesorten	6	8.5	10
+104	Sucuk	Sucuk, Zwiebeln	6	8.5	10
+105	Adana	Sucuk, Paprika, Champignons	6	8.5	10
+106	Mozzarella	Mozzarella, frische Tomaten	6	8.5	10
+107	Alberto	Schinken, Spinat, Spargel, Spiegelei	6	8.5	10
+108	Mamma Mia	Schinken, Champignons, Spargel	6	8.5	10
+109	Picante	Spinat, Krabben, Oliven, Knoblauch, scharf	6	8.5	10
+110	Gilberto	Spinat, Broccoli, Mais	6	8.5	10
+111	Spaghetti	Spaghetti, Fleischsauce	6	8.5	10
+112	Carbonara	Spaghetti, Schinken, Sahnesauce, Ei	6	8.5	10
+113	La Barca	Thunfisch, Krabben, Sardellen, Peperoni, scharf	6	8.5	10
+114	La Rustica	Salami, Schinken, frische Champignons, Spiegelei	6	8.5	10
+115	Tutti Frutti	Banane, Schinken, Ananas	6	8.5	10
+116	Feta Spezial	Fetakäse, Spinat, Oliven, scharf	6	8.5	10
+117	Chef Spezial	Dönerfleisch, Zwiebeln, Eisbergsalat, Tomaten, Gurken, Knoblauchsauce	6	8.5	10
+118	Nach Art des Hauses	Salami, Schinken, Thunfisch, frische Champignons, Zwiebeln	6	8.5	10
+119	Curry	Hähnchenfilet, Ananas, Currysauce	6	8.5	10
+120	Siciliana	Sardellen, Kapern, frische Tomaten, Knoblauch	6	8.5	10
+121	Nancy	Thunfisch, Sardellen, Knoblauch, Muscheln, Kapern, scharf	6	8.5	10
+122	Miri	Spinat, Muscheln, Kapern, Knoblauch	6	8.5	10
+123	Palermo	Spinat, Spargel, Champignons, Spiegelei	6	8.5	10
+124	Dülle	Thunfisch, Gorgonzola	6	8.5	10
+125	Mama	Salami, Schinken, Champignons, Paprika, Artischocken, Peperoni, scharf	6	8.5	10
+126	Alfredo	Thunfisch, Ananas	6	8.5	10
+127	Gino	Thunfisch, Mais, gekochtes Ei	6	8.5	10
+128	Diddi	Schinken, Rucola, frische Tomaten, Parmesankäse	6	8.5	10
+129	Rucola Spezial	Salami, Schinken, Rucola, frische Tomaten, Parmesankäse	6	8.5	10
+130	Salamon	Räucherlachs, Zwiebeln	6	8.5	10
+131	Speziale	Lachs, Krabben, Rucola, Parmesankäse	6	8.5	10
+132	Selm	Fetakäse, Zwiebeln, Oliven, frische Tomaten	6	8.5	10
+133	Napoli	Napolisauce, Spaghetti, Ketchup	6	8.5	10
+134	Totto	Thunfisch, Krabben, Eisbergsalat, Remoulade	6	8.5	10
+135	Jannes	Schinken, Thunfisch, frische Champignons, Paprika	6	8.5	10
+136	Überraschung	von Allem etwas			11
+137	Pizza Vulcano	Schinken, Salami u. Paprika	6	8.5	10
+138	Pizza Regina	Schinken, Thunfisch u. Paprika	6	8.5	10
+139	Pizza Pollo	Hähnchenbrustfilet, Zwiebeln u. Paprika	6	8.5	10
+140	Pizza Angelo	Dönerfleisch, Champignons u. Paprika	6	8.5	10
+141	Pizza Amore	Hähnchenbrustfilet, Zwiebeln, Paprika, Champignons u. Sahnesauce	6	8.5	10
+142	Pizza Unita	Thunfisch, Oliven, Spinat u. Zwiebeln	6	8.5	10
+143	Pizza Camillo	Mozzarella, Thunfisch, Peperoni u. Tomaten	6	8.5	10
+# pizza-gefuellt	Gefüllte Pizzen	pizza
+155	Calzone	Salami, Schinken, frische Champignons, Paprika		8.5	10
+156	Diavolo	gefüllte Pizza, Salami, Schinken, Thunfisch, Paprika, scharf		8.5	10
+157	Nizza	Spinat, Broccoli, frische Champignons, Spargel		8.5	10
+158	Mexicana	Hackfleisch, Zwiebeln, Paprika, Mais, Peperoni, scharf		8.5	10
+160	Fantastico	Dönerfleisch, Champignons, Zwiebeln, Hollandaise		8.5	10
+161	Giovanni	Hähnchenstreifen, Champignons, Paprika, Hollandaise		8.5	10
+162	Perfecto Hähnchen	Hähnchenstreifen, Champignons, Zwiebeln, Hollandaise		8.5	10
+163	Perfecto Döner	Dönerfleisch, Paprika, Champignons, Hollandaise		8.5	10
+164	Calzione Spezial	Hackfleisch, Champignons, Zwiebeln, scharf		8.5	10
+# bomba	Bomba	simple
+159	Bomba	gefüllte Pizza für 2 Personen: Salami, Schinken, Paprika, frische Champignons, Thunfisch, 1 Fl. Cola 1,0 L (nur außer Haus)	15
+# pizza-gyros	Gyros Pizzen	pizza
+170	Nana Gyrosfleisch	Tomatensauce, Käse, Zwiebeln	6.5	9	10.5
+171	Roberto	Gyrosfleisch, Spinat, Spargel, Hollandaise	6.5	9	10.5
+172	Franco Gyrosfleisch	Tomatensauce, Käse, Paprika, frische Champignons	6.5	9	10.5
+173	Giovani	Gyrosfleisch, Auberginen, Fetakäse, Zwiebeln, frische Tomaten	6.5	9	10.5
+174	Sole Mio	Gyrosfleisch, Tomatensauce, Käse, Krabben, Zwiebeln, Paprika	6.5	9	10.5
+175	Gyros Spezial	Gyrosfleisch, Fetakäse, Spinat, scharf	6.5	9	10.5
+# pizza-bolognese	Pizzen mit Bolognesesauce	pizza
+176	Bolognese	Fleischsauce	6	8.5	9.5
+177	Bolognese Spezial	Bolognesesauce, frische Champignons, Spiegelei, scharf	6	8.5	10
+178	Bolognese Mexicana	Bolognesesauce, Chilibohnen, Schinken, scharf	6	8.5	10
+179	Toscana	Bolognesesauce, frische Paprika, Mais, Chilibohnen	6	8.5	10
+# pizza-hollandaise	Pizzen mit Sauce Hollandaise	pizza
+190	Hollandaise mit Schinken und Spargel			8.5	10
+191	Hollandaise mit Schinken, Spargel und Spinat			8.5	10
+192	Hollandaise mit Spinat, Broccoli und Spargel			8.5	10
+193	Hollandaise mit Hähnchenbrustfilet, Ananas und Mais			8.5	10
+194	Hollandaise mit Hähnchenbrustfilet, Broccoli und Spargel			8.5	10
+195	Hollandaise mit Hähnchenbrustfilet, Champignons und Zwiebeln			8.5	10
+196	Hollandaise mit Dönerfleisch, Zwiebeln und Knoblauch			8.5	10
+197	Hollandaise mit Dönerfleisch, Champignons und Broccoli			8.5	10
+198	Hollandaise mit Dönerfleisch, Krabben, Spinat und Knoblauch	scharf		8.5	10
+199	Hollandaise mit Spargel und Krabben			8.5	10
+200	Hollandaise mit Gyrosfleisch und Zwiebeln			8.5	10
+201	Hollandaise mit Gyrosfleisch, Champignons und Krabben			8.5	10
+202	Hollandaise mit Dönerfleisch und milden Peperonis			8.5	10
+203	Hollandaise mit Fetakäse, Spinat und Oliven	scharf		8.5	10
+# spaghetti	Pasta - Nudeln - Spaghetti	simple	note=Zu jedem Nudelgericht erhalten Sie 5 Pizzabrötchen und Kräutercreme
+210	Spaghetti Napoli	in Tomatensauce, Knoblauch	6.5
+211	Spaghetti Bolognese	in Fleischsauce	7
+212	Spaghetti Carbonara	in Schinken-Sahnesauce, mit Ei	7.5
+213	Spaghetti al Forno	mit Fleischsauce, Käse, überbacken	7.5
+214	Spaghetti mit Baby-Muscheln	in Knoblauch-Tomatensauce	8
+215	Gebratene Nudeln mit Gemüse		8
+216	Gebratene Nudeln mit Krabben und Gemüse		8
+217	Gebratene Nudeln mit Hähnchenbrustfilet, Ei und Gemüse		8
+218	Spaghetti Tonno	mit Thunfisch, Napolisauce	8
+219	Spaghetti al Vegetaria	mit Broccoli, Spinat, frischen Champignons, Paprika in Tomaten-Sahnesauce, Käse, überbacken	8
+220	Spaghetti di Mare	mit Meeresfrüchten, Napolisauce, Knoblauch	8
+221	Spaghetti Pifferlinge	mit Pfifferlingen, Sahne-Cremesauce	8
+222	Spaghetti Hans	mit Paprika, Zwiebeln, frischen Tomaten, Krabben, Tomatensauce	8
+223	Spaghetti alla Pollo	Hähnchenstreifen, Sahnesauce	8
+# rigatoni	Pasta - Nudeln - Rigatoni	simple
+224	Rigatoni Napoli	mit Tomatensauce, Knoblauch	6.5
+225	Rigatoni Bolognese	mit Fleischsauce	7.5
+226	Rigatoni Carbonara	mit Schinken, Sahne, Ei	7.5
+227	Rigatoni al Forno	mit Fleischsauce, Käse, überbacken	8
+228	Rigatoni Tonno	mit Thunfisch, Napolisauce	8
+229	Rigatoni al Vegetaria	mit Broccoli, Champignons, Spinat, Paprika in Tomaten-Sahnesauce, Käse, überbacken	8
+230	Rigatoni al Arrabiata	mit frischen Tomaten, Zwiebeln, Peperoni, Knoblauch, Olivenöl, scharf	8
+231	Rigatoni Basciola	mit Mais, Schinken in Tomaten-Sahnesauce, Tabasco, scharf	8
+232	Rigatoni Quattro Formaggi	mit vier Käsesorten in Sahnesauce	8
+233	Rigatoni Pfifferlinge	mit Pfifferlingen, Sahne-Cremesauce	8
+234	Rigatoni Salmone	Lachs in Tomaten-Sahnesauce	8
+235	Rigatoni Italia	mit Hähnchenbrust, Currysauce, Ananas	8
+236	Rigatoni Michael	gebratene Rigatoni, Hähnchenbrustfilet, Gemüse, Ei, Sojasauce	8
+237	Rigatoni Siggi	mit Pfifferlingen, Champignons, Spinat, Broccoli, Sahnesauce, Käse, überbacken, scharf	8
+238	Rigatoni Sabine	mit Paprika, Zwiebeln, Champignons, Tomatensauce	8
+# tortellini	Pasta - Nudeln - Tortellini	simple
+239	Tortellini Napoli	mit Tomatensauce, Knoblauch	7
+240	Tortellini Bolognese	mit Fleischsauce	7
+241	Tortellini al Forno	mit Fleischsauce, Käse, überbacken	8
+242	Tortellini Peter	mit Schinken-Sahnesauce	8
+243	Tortellini Carbonara	mit Schinken, in Sahnesauce, Ei	8
+244	Tortellini Bascaiola	mit Mais, Schinken	8
+245	Tortellini Quattro Formaggi	mit vier verschiedenen Käsesorten, in Sahnesauce	8
+246	Tortellini La Mamma	mit Sahnesauce, Schinken, Artischocken, Thunfisch, Peperoni, Käse, überbacken, scharf	8
+247	Tortellini Adam	mit Broccoli, Dönerfleisch, Champignons, Sahnesauce, Käse, überbacken	8
+248	Tortellini Alla Pollo	Hähnchenstreifen, Sahnesauce	8
+# tagliatelle	Pasta - Nudeln - Tagliatelle	simple
+249	Tagliatelle al Broccoli	Champignons und Filetspitzen in Sahnesauce, Käse überbacken	8
+250	Tagliatelle La Scala	mit Gorgonzola-Sahnesauce und Spinat	8
+251	Tagliatelle Quattro Formaggi	mit 4 versch. Käsesorten in Sahnesauce	8
+252	Tagliatelle Napoli	Tomatensauce	7.5
+253	Tagliatelle Ai Funghi	mit Champignons und Sahnesauce	7.5
+254	Tagliatelle Milano	Champignons, Erbsen, Schinken, Sahne, pikante Tomatensauce	8
+255	Tagliatelle Alla Chef	mit Lachs, Champignons und Sahnesauce	8
+256	Tagliatelle Bolognese	mit Fleischsauce	8
+257	Tagliatelle Scampi	mit Krabben, Spinat, Knoblauch und Tomaten-Sahnesauce	8
+258	Tagliatelle Pollo Gerd	mit Hähnchenfiletstreifen, Champignons, Paprika, Zwiebeln, Broccoli und Tomatensauce	8
+259	Tagliatelle Montanara	frische Champignons und Sahne-Fleischsauce	8
+260	Tagliatelle Mopi	mit Krabben, Spinat, Tomaten, Sahnesauce und Knoblauch	8
+261	Tagliatelle Salmone	mit Lachs, Spinat, Sahnesauce und Knoblauch	8
+# backofen	Aus dem Backofen	simple
+262	Lasagne al Forno	Fleischsauce, Schinken, Sahnecreme, Käse überbacken	8
+263	Lasagne Salmone Spinaci	Lachs, Spinat, Tomaten-Sahnesauce, Käse überbacken	8
+264	Lasagne al Vegetaria	Zucchini, Aubergine, Tomaten-Sahnesauce, Käse überbacken	8
+265	Trio Pasta	Champignons-Sahnesauce, 3 versch. Nudelsorten mit Käse überbacken	8
+266	Trio Pasta al Forno	drei Nudelsorten, Fleischsauce, Käse überbacken	8
+267	Cannelloni Ripieni	gefüllte Nudeln mit Schinken, Spinat, Sahne, Käse überbacken	8
+268	Cannelloni Bolognese	gefüllte Nudeln mit Fleischsauce und Käse überbacken	8
+269	Cannelloni Calabrese	gefüllte Nudeln mit Mozzarella, fr. Tomaten, Käse überbacken	8
+270	Cannelloni Salmone	gefüllte Nudeln mit Lachs, Spinat, Cremesauce, Käse überbacken	8
+# gnocchi	Pasta - Nudeln - Gnocchi	simple
+271	Gnocchi Napoli	mit Tomatensauce	7.5
+272	Gnocchi Bolognese	mit Bolognesesauce und Parmesan, gerieben	8
+273	Gnocchi Pomodorò	mit Tomatensauce und Mozzarella	8
+274	Gnocchi Mamma Leone	mit Spinat und Cremesauce	8
+275	Gnocchi Formaggi	mit versch. Sorten Käse	8
+276	Gnocchi Tris Angelotti	mit 3 versch. Saucen	8
+277	Gnocchi Gorgonzola	mit Gorgonzola-Cremesauce	8
+278	Gnocchi Salmone	mit Lachs, Spinat und Cremesauce	8
+279	Gnocchi Vegetaria	mit Broccoli, Spinat, Champignons und Tomaten-Sahnesauce	8
+# auflaeufe	Aufläufe	simple
+280	Kartoffel-Gratin	in würziger Sahnesauce, Käse, überbacken	8
+281	La Scala mit Gemüse	Spinat, Broccoli, Blumenkohl in Knoblauchsauce, Käse, überbacken	9
+282	Spinaci al Forno	Spinat, Cremesauce überbacken	8
+283	Broccoli al Forno	Broccoli, Cremesauce überbacken	8
+284	Auflauf Spinat	mit Kartoffelscheiben, Blattspinat, Sauce Hollandaise, Käse, überbacken	9
+285	Auflauf Broccoli	mit Kartoffelscheiben, Broccoli, Sauce Hollandaise, Käse, überbacken	9
+286	Auflauf Bolognese	mit Kartoffelscheiben, Bolognese, Sauce Hollandaise, Käse, überbacken	9
+287	Auflauf Gamberetti	mit Kartoffelscheiben, Krabben, Sahnesauce, Käse, überbacken	9
+287a	Hähnchenauflauf	mit Hähnchenstreifen, Champignons, Broccoli, Sauce Hollandaise, Kartoffeln, Käse überbacken	10
+288	Auflauf Döner	mit Kartoffelscheiben, Dönerfleisch, Champignons, Tomaten-Sahnesauce, Käse überbacken	9
+289	Auflauf nach Art des Hauses	Auberginen mit Fleischsauce, Knoblauch, Käse, überbacken	8
+289a	Döneraufauf	mit Kartoffelscheiben, Dönerfleisch, Champignons, Broccoli, Sauce Hollandaise, Kartoffeln, Käse überbacken	10
+# schnitzel	Schnitzel	simple	note=Vom Schwein. Beilagen: Salat und wahlweise Pommes frites oder Kroketten
+300	Schnitzel „Wiener Art“	mit Zitronenscheiben	9
+301	Jägerschnitzel		10
+302	Zigeunerschnitzel		10
+303	Hawaiischnitzel	mit Schinken, Ananas, Käse, überbacken	10
+304	Diavoloschnitzel	mit scharfen Peperoni, Paprika, Käse, überbacken	10
+305	Broccolischnitzel	mit Broccoli, Knoblauch, Käse, überbacken	10
+306	Spargelschnitzel	mit Spargel, Käse, überbacken	10
+307	Schnitzel al Franco	mit Broccoli, Spinat, Paprika, Knoblauch, mit Schafskäse überbacken	10
+308	Schnitzel nach Art des Hauses	mit Champignons, Gorgonzola-Sahnesauce	10
+309	Bologneseschnitzel	mit Fleischsauce	10
+310	Cordon bleu	gefüllt mit Käse, Schinken, dazu Sahne-Cremesauce	11
+311	Zwiebelschnitzel	mit Spiegelei	10
+312	Champignon-Zwiebel	mit gerösteten Zwiebeln und Champignons	10
+313	Doris	mit gerösteten Zwiebeln, Champignons und Hollandaise	10
+314	Mexicoschnitzel	mit Mais und Paprika (scharf)	10
+315	Marsalaschnitzel	mit Marsalasauce und Champignons	9
+316	Peperonischnitzel	mit Peperoni (scharf) und Bolognesesauce	10
+317	Hollandaiseschnitzel mit Spargel	mit Spargel, Hollandaise	10
+318	Hollandaiseschnitzel mit Broccoli	mit Broccoli, Hollandaise	10
+318a	Rahmschnitzel	mit Rahmsauce	10
+# gefluegel	Geflügelgerichte	simple	note=Beilagen: Salat und wahlweise Pommes frites oder Kroketten
+319	Hähnchengeschnetzeltes Ananas-Curry	mit Ananas und Currysauce	10.5
+320	Hähnchengeschnetzeltes Erbsen-Champignons	mit Erbsen, Champignons, Sahne-Cremesauce	10.5
+321	Geflügel Cordon bleu	Sahne-Cremesauce	11
+322	Chicken Wings	10 Hähnchenflügel, scharf gewürzt, mit Knoblauchsauce	8
+323	Chicken Nuggets	10 Stück, mit Knoblauchsauce	8

@@ -1,0 +1,27 @@
+# Abhängigkeiten
+node_modules/
+
+# Geheimnisse – niemals ins Repo
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+logs
+
+# Laufzeit
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Betriebssystem / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Generierte Berichte (enthalten Umsatzdaten)
+PDFs/
