@@ -1439,7 +1439,8 @@ function generatePdf(buildFn) {
 const PDF_M  = 50;
 const PDF_W  = 495;
 const PDF_PW = 595;
-const PDF_FT = 810;
+const PDF_FT = 790; // Unterkante fuer Tabellenzeilen. Der Textbereich endet bei page.height-50 = 791,9;
+                    // reicht eine Zeile darueber, bricht pdfkit selbst um und jede Zelle landet auf eigener Seite.
 const PDF_SV = 0;
 const PDF_BASE = 150; // monatliche Grundgebühr (Fixmodell: 150 € + Servicegebühr/Bestellung)
 const pdfFmt = n => n.toFixed(2).replace('.', ',') + ' €';
@@ -1482,6 +1483,8 @@ function pdfTableRow(doc, cells, shade, bold = false) {
 function pdfKundenliste(doc, orders) {
   function drawGroup(label, color, list) {
     if (!list.length) return;
+    // Gruppenkopf + Spaltenkopf + erste Zeilen zusammenhalten
+    if (doc.y > PDF_FT - 90) { doc.addPage(); doc.y = PDF_M; }
     const gy = doc.y;
     doc.rect(PDF_M, gy, PDF_W, 22).fill(color);
     doc.font('Helvetica-Bold').fontSize(10).fillColor('#fff').text(label, PDF_M + 8, gy + 6, { width: PDF_W - 16 });
@@ -1494,7 +1497,8 @@ function pdfKundenliste(doc, orders) {
     doc.y = hy + 16 + 2;
     let sub = 0;
     list.forEach((o, i) => {
-      if (doc.y > PDF_FT - 24) { doc.addPage(); doc.y = PDF_M; }
+      // letzte Zeile nicht ohne ihre Summenzeile (20 pt) auf der alten Seite lassen
+      if (doc.y > PDF_FT - (i === list.length - 1 ? 44 : 24)) { doc.addPage(); doc.y = PDF_M; }
       const date = new Date(o.createdAt).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }) + '.';
       const name = `${o.customer?.first||''} ${o.customer?.last||''}`.trim().substring(0, 28);
       const modeStr = o.mode === 'lieferung' ? 'Lieferung' : 'Abholung';
@@ -1510,6 +1514,7 @@ function pdfKundenliste(doc, orders) {
       doc.y = ry + 18;
       sub += (o.total||0);
     });
+    if (doc.y > PDF_FT - 24) { doc.addPage(); doc.y = PDF_M; }
     const sy = doc.y;
     doc.rect(PDF_M, sy, PDF_W, 20).fill(color + '28');
     doc.font('Helvetica').fontSize(9).fillColor('#333').text(`Summe ${label}:`, PDF_M+8, sy+5);
@@ -1564,6 +1569,8 @@ function pdfBarRechnung(doc, barOrders, barStats, zeitraum) {
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#1a1a2e').text(pdfFmt(sf), PDF_M+2, ry+4, { width:PDF_W-4, align:'right' });
     doc.y = ry + 16;
   });
+  // Summenblock (Linie, Servicegebuehren, Summe, Hinweis, ca. 80 pt) zusammenhalten
+  if (doc.y > PDF_FT - 80) { doc.addPage(); doc.y = PDF_M; }
   doc.moveTo(PDF_M, doc.y).lineTo(PDF_M+PDF_W, doc.y).strokeColor('#333').lineWidth(1).stroke(); doc.y += 4;
   const s1y = doc.y;
   doc.rect(PDF_M, s1y, PDF_W, 18).fill('#f0f4f8');
@@ -1750,8 +1757,11 @@ function buildWochenberichtPdf(doc, d) {
   if (barOrders.length > 0) {
     pdfBarRechnung(doc, barOrders, { barSvc, barNetto, barBetrag }, vonBis);
   }
+  // y=820 liegt unter dem Textbereich (791,9) - Rand kurz auf 0, sonst haengt pdfkit eine leere Seite an
+  const _mb = doc.page.margins.bottom; doc.page.margins.bottom = 0;
   doc.font('Helvetica').fontSize(7).fillColor('#bbb')
-    .text(`FlueVate · Abed Rachman Falah · Zur Goldbrede 30 · 59269 Beckum  ·  Wochenbericht KW ${kw} / ${jahr}`, PDF_M, 820, { width: PDF_W, align: 'center' });
+    .text(`FlueVate · Abed Rachman Falah · Zur Goldbrede 30 · 59269 Beckum  ·  Wochenbericht KW ${kw} / ${jahr}`, PDF_M, doc.page.height - 28, { width: PDF_W, align: 'center', lineBreak: false });
+  doc.page.margins.bottom = _mb;
 }
 
 // Baut und versendet den Wochenbericht fuer die Woche, die auf `now` endet.
@@ -1902,8 +1912,11 @@ function buildMonatsberichtPdf(doc, d) {
   if (barOrdersM.length > 0) {
     pdfBarRechnung(doc, barOrdersM, { barSvc: barSvcM, barNetto: barNettoM, barBetrag: barBetragM }, vonBis);
   }
+  // y=820 liegt unter dem Textbereich (791,9) - Rand kurz auf 0, sonst haengt pdfkit eine leere Seite an
+  const _mb = doc.page.margins.bottom; doc.page.margins.bottom = 0;
   doc.font('Helvetica').fontSize(7).fillColor('#bbb')
-    .text(`FlueVate · Abed Rachman Falah · Zur Goldbrede 30 · 59269 Beckum  ·  Monatsbericht ${monat}`, PDF_M, 820, { width: PDF_W, align: 'center' });
+    .text(`FlueVate · Abed Rachman Falah · Zur Goldbrede 30 · 59269 Beckum  ·  Monatsbericht ${monat}`, PDF_M, doc.page.height - 28, { width: PDF_W, align: 'center', lineBreak: false });
+  doc.page.margins.bottom = _mb;
 }
 
 
