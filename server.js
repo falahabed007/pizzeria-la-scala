@@ -1964,11 +1964,17 @@ cron.schedule('0 22 * * *', async () => {
       barOrdersM, barSvcM, barNettoM, barBetragM, weekRows,
     }));
 
-    // ── E-Mail: Restaurant ────────────────────────────────────────────────
-    if (process.env.RESTAURANT_EMAIL) {
-      await getResend()?.emails.send({
+    // ── E-Mail: Restaurant + Inhaber ───────────────────────────────────────────
+    // INHABER_EMAIL bekommt nur den Monatsbericht, INHABER_CC (z.B. Steuerberater,
+    // mehrere mit Komma) steht dabei in CC. Je Empfaenger-Rolle eine eigene Mail.
+    const versandt = [];
+    const inhaberCc = (process.env.INHABER_CC || '').split(',').map(a => a.trim()).filter(Boolean);
+    for (const [rolle, an, cc] of [['restaurant', process.env.RESTAURANT_EMAIL, []], ['inhaber', process.env.INHABER_EMAIL, inhaberCc]]) {
+      if (!an) continue;
+      const antwort = await getResend()?.emails.send({
         from: process.env.EMAIL_FROM || 'system@pizzerialascala.de',
-        to:   process.env.RESTAURANT_EMAIL,
+        to:   an,
+        ...(cc.length ? { cc } : {}),
         subject: `📅 Monatsbericht ${monat} · Pizzeria La Scala`,
         html: `<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#222">
   <div style="background:#d32027;padding:24px 28px;color:#fff">
@@ -1987,11 +1993,13 @@ cron.schedule('0 22 * * *', async () => {
 </div>`,
         attachments: [{ filename: `${monat.replace(' ','_')}_La Scala_Monatsbericht.pdf`, content: monatsPdf.toString('base64') }],
       });
+      if (!antwort || antwort.error) console.error(`Monatsbericht an ${rolle} nicht versendet:`, antwort?.error || 'kein RESEND_API_KEY');
+      else versandt.push(rolle + (cc.length ? ` (cc ${cc.length})` : ''));
     }
 
     // ── E-Mail: Owner ─────────────────────────────────────────────────────
     if (process.env.OWNER_EMAIL) {
-      await getResend()?.emails.send({
+      const antwort = await getResend()?.emails.send({
         from: process.env.EMAIL_FROM || 'system@pizzerialascala.de',
         to: process.env.OWNER_EMAIL,
         subject: `📅 Monatsbericht ${monat} · Pizzeria La Scala`,
@@ -2002,8 +2010,10 @@ cron.schedule('0 22 * * *', async () => {
           { filename: `${monat.replace(' ','_')}_La Scala_Monatsbericht.pdf`, content: monatsPdf.toString('base64') },
         ],
       });
+      if (!antwort || antwort.error) console.error('Monatsbericht an owner nicht versendet:', antwort?.error || 'kein RESEND_API_KEY');
+      else versandt.push('owner');
     }
-    console.log(`📅 Monatsbericht ${monat} versendet`);
+    console.log(`📅 Monatsbericht ${monat} an: ` + (versandt.join(', ') || 'NIEMANDEN'));
   } catch(e) { console.error('Monatsbericht Fehler:', e); }
 });
 
@@ -2080,17 +2090,27 @@ app.post('/api/admin/send-monthly', auth, async (req, res) => {
       barOrdersM, barSvcM, barNettoM, barBetragM, weekRows,
     }));
 
-    if (process.env.RESTAURANT_EMAIL) {
-      await getResend()?.emails.send({
+    // ?nur=restaurant|inhaber|owner: Probelauf an nur eine Rolle
+    const nur = req.query.nur;
+    // INHABER_EMAIL bekommt nur den Monatsbericht, INHABER_CC (z.B. Steuerberater,
+    // mehrere mit Komma) steht dabei in CC. Je Empfaenger-Rolle eine eigene Mail.
+    const versandt = [];
+    const inhaberCc = (process.env.INHABER_CC || '').split(',').map(a => a.trim()).filter(Boolean);
+    for (const [rolle, an, cc] of [['restaurant', process.env.RESTAURANT_EMAIL, []], ['inhaber', process.env.INHABER_EMAIL, inhaberCc]]) {
+      if (!an || (nur && nur !== rolle)) continue;
+      const antwort = await getResend()?.emails.send({
         from: process.env.EMAIL_FROM || 'system@pizzerialascala.de',
-        to: process.env.RESTAURANT_EMAIL,
+        to:   an,
+        ...(cc.length ? { cc } : {}),
         subject: `📅 Monatsbericht ${monat} · Pizzeria La Scala`,
-        html: `<p style="font-family:Arial,sans-serif">Manuell ausgelöster Monatsbericht für <b>${monat}</b>.<br>${orders.length} Bestellungen · Auszahlung: ${auszahlung.toFixed(2).replace('.',',')} €</p>`,
+        html: `<p style="font-family:Arial,sans-serif">Monatsbericht für <b>${monat}</b>.<br>${orders.length} Bestellungen · Auszahlung: ${auszahlung.toFixed(2).replace('.',',')} €</p>`,
         attachments: [{ filename: `${monat.replace(' ','_')}_La Scala_Monatsbericht.pdf`, content: monatsPdf.toString('base64') }],
       });
+      if (!antwort || antwort.error) console.error(`Monatsbericht an ${rolle} nicht versendet:`, antwort?.error || 'kein RESEND_API_KEY');
+      else versandt.push(rolle + (cc.length ? ` (cc ${cc.length})` : ''));
     }
-    if (process.env.OWNER_EMAIL) {
-      await getResend()?.emails.send({
+    if (process.env.OWNER_EMAIL && (!nur || nur === 'owner')) {
+      const antwort = await getResend()?.emails.send({
         from: process.env.EMAIL_FROM || 'system@pizzerialascala.de',
         to: process.env.OWNER_EMAIL,
         subject: `📅 Monatsbericht ${monat} · Pizzeria La Scala`,
@@ -2101,10 +2121,22 @@ app.post('/api/admin/send-monthly', auth, async (req, res) => {
           { filename: `${monat.replace(' ','_')}_La Scala_Monatsbericht.pdf`, content: monatsPdf.toString('base64') },
         ],
       });
+      if (!antwort || antwort.error) console.error('Monatsbericht an owner nicht versendet:', antwort?.error || 'kein RESEND_API_KEY');
+      else versandt.push('owner');
     }
-    console.log(`📅 Monatsbericht ${monat} manuell versendet (${orders.length} Bestellungen)`);
+    console.log(`📅 Monatsbericht ${monat} manuell an: ` + (versandt.join(', ') || 'NIEMANDEN') + ` (${orders.length} Bestellungen)`);
     res.json({
       success: true, monat, orders: orders.length,
+      empfaenger: versandt,
+      // Nur Ja/Nein, nie die Werte selbst - sagt genau, welche Variable fehlt.
+      konfig: {
+        RESEND_API_KEY:   !!process.env.RESEND_API_KEY,
+        RESTAURANT_EMAIL: !!process.env.RESTAURANT_EMAIL,
+        INHABER_EMAIL:    !!process.env.INHABER_EMAIL,
+        INHABER_CC:       !!process.env.INHABER_CC,
+        OWNER_EMAIL:      !!process.env.OWNER_EMAIL,
+      },
+      warnung: versandt.length ? undefined : 'Es wurde nichts verschickt. Siehe konfig: was auf false steht, fehlt in Coolify.',
       monatsPdfBase64: monatsPdf.toString('base64'),
     });
   } catch(e) {
