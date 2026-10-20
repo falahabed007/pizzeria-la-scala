@@ -1499,7 +1499,7 @@ function pdfKundenliste(doc, orders) {
     list.forEach((o, i) => {
       // letzte Zeile nicht ohne ihre Summenzeile (20 pt) auf der alten Seite lassen
       if (doc.y > PDF_FT - (i === list.length - 1 ? 44 : 24)) { doc.addPage(); doc.y = PDF_M; }
-      const date = new Date(o.createdAt).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }) + '.';
+      const date = new Date(o.createdAt).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }); // liefert schon "13.10."
       const name = `${o.customer?.first||''} ${o.customer?.last||''}`.trim().substring(0, 28);
       const modeStr = o.mode === 'lieferung' ? 'Lieferung' : 'Abholung';
       const ry = doc.y;
@@ -1516,7 +1516,7 @@ function pdfKundenliste(doc, orders) {
     });
     if (doc.y > PDF_FT - 24) { doc.addPage(); doc.y = PDF_M; }
     const sy = doc.y;
-    doc.rect(PDF_M, sy, PDF_W, 20).fill(color + '28');
+    doc.save().fillOpacity(0.16).rect(PDF_M, sy, PDF_W, 20).fill(color).restore(); // heller Ton der Gruppenfarbe
     doc.font('Helvetica').fontSize(9).fillColor('#333').text(`Summe ${label}:`, PDF_M+8, sy+5);
     doc.font('Helvetica-Bold').fontSize(10).fillColor('#333').text(pdfFmt(sub), PDF_M+2, sy+5, { width:PDF_W-4, align:'right' });
     doc.y = sy + 20 + 10;
@@ -1544,7 +1544,7 @@ function pdfBarRechnung(doc, barOrders, barStats, zeitraum) {
   doc.y += 12;
   const hy = doc.y;
   doc.rect(PDF_M, hy, PDF_W, 16).fill('#fef9e7');
-  doc.font('Helvetica').fontSize(7.5).fillColor('#7a5c00').text('ℹ  Interne Übersicht – keine Rechnung. Nur Barzahlungen; Stripe-Gebühren wurden bereits beim Checkout einbehalten.', PDF_M+6, hy+4, { width:PDF_W-12 });
+  doc.font('Helvetica').fontSize(7.5).fillColor('#7a5c00').text('Interne Übersicht – keine Rechnung. Nur Barzahlungen; Stripe-Gebühren wurden bereits beim Checkout einbehalten.', PDF_M+6, hy+4, { width:PDF_W-12 });
   doc.y = hy + 16 + 6;
   doc.moveTo(PDF_M, doc.y).lineTo(PDF_M+PDF_W, doc.y).strokeColor('#333').lineWidth(1).stroke(); doc.y += 4;
   const th = doc.y;
@@ -1556,7 +1556,7 @@ function pdfBarRechnung(doc, barOrders, barStats, zeitraum) {
   barOrders.forEach((o, i) => {
     if (doc.y > PDF_FT - 20) { doc.addPage(); doc.y = PDF_M; }
     const sf   = o.serviceFee || PDF_SV;
-    const date = new Date(o.createdAt).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }) + '.';
+    const date = new Date(o.createdAt).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }); // liefert schon "13.10."
     const name = `${o.customer?.first||''} ${o.customer?.last||''}`.trim().substring(0, 24);
     const ry = doc.y;
     if (i % 2 === 0) doc.rect(PDF_M, ry, PDF_W, 16).fill('#f8f9fc');
