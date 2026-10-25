@@ -1527,6 +1527,60 @@ function pdfKundenliste(doc, orders) {
   drawGroup('EC-Karte', '#555555', orders.filter(o => o.payment === 'karte'));
 }
 
+// Stornierte Bestellungen des Zeitraums - fuer den Nachweis gegenueber Inhaber und Steuerberater (Abed, 25.10.2026).
+// Zaehlen nicht zum Umsatz und nicht zu den Gebuehren, stehen aber vollstaendig im Bericht. Steht keine im Zeitraum,
+// sagt der Bericht das ausdruecklich, statt den Abschnitt wegzulassen. Abgebrochene Online-Zahlungen (nie bezahlt,
+// Stripe setzt sie auf cancelled) sind keine Stornos und bleiben draussen (Abed, 25.10.).
+function pdfStornoliste(doc, alle) {
+  const stornos = alle.filter(o => !(['stripe','paypal'].includes(o.payment) && !['paid','refunded'].includes(o.paymentStatus)));
+  if (doc.y > PDF_FT - 90) { doc.addPage(); doc.y = PDF_M; }
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a2e').text('STORNIERUNGEN', PDF_M, doc.y);
+  doc.y += 12;
+  if (!stornos.length) {
+    doc.font('Helvetica').fontSize(9).fillColor('#555').text('Keine stornierten Bestellungen im Zeitraum.', PDF_M + 8, doc.y);
+    doc.y += 18;
+    return;
+  }
+  const zeit = d => new Date(d).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', timeZone:'Europe/Berlin' }).replace(',', '');
+  const zahlart = o => ({ bar:'Bar', karte:'EC-Karte', stripe:'Online', paypal:'PayPal' }[o.payment] || o.payment || '–')
+    + (o.paymentStatus === 'refunded' ? ', erstattet' : '');
+  const kurz = (s, n) => s.length > n ? s.substring(0, n - 1) + '…' : s; // eine Zeile je Storno, sonst ueberlappt die Summe
+  const grund = o => kurz(o.cancelReason || '–', 24);
+  const spalten = [['#', PDF_M+2, 30, 'left'], ['Bestellt', PDF_M+34, 62, 'left'], ['Storniert', PDF_M+98, 62, 'left'],
+    ['Kunde', PDF_M+162, 100, 'left'], ['Zahlart', PDF_M+264, 72, 'left'], ['Grund', PDF_M+338, 105, 'left'], ['Betrag', PDF_M+2, PDF_W-4, 'right']];
+  const kopf = () => {
+    const hy = doc.y;
+    doc.rect(PDF_M, hy, PDF_W, 16).fill('#f3e3e3');
+    spalten.forEach(([h, x, w, a]) => doc.font('Helvetica-Bold').fontSize(8).fillColor('#5a2a2a').text(h, x, hy+4, { width:w, align:a }));
+    doc.y = hy + 16 + 2;
+  };
+  kopf();
+  let summe = 0;
+  stornos.forEach((o, i) => {
+    if (doc.y > PDF_FT - (i === stornos.length - 1 ? 44 : 24)) { doc.addPage(); doc.y = PDF_M; kopf(); }
+    const ry = doc.y;
+    if (i % 2 === 0) doc.rect(PDF_M, ry, PDF_W, 18).fill('#fafafa');
+    const name = `${o.customer?.first||''} ${o.customer?.last||''}`.trim().substring(0, 22);
+    doc.font('Helvetica').fontSize(8).fillColor('#222')
+      .text(`${o.orderNum}`,                PDF_M+2,   ry+5, { width:30, lineBreak:false })
+      .text(zeit(o.createdAt),                PDF_M+34,  ry+5, { width:62, lineBreak:false })
+      .text(zeit(o.updatedAt || o.createdAt), PDF_M+98,  ry+5, { width:62, lineBreak:false })
+      .text(name,                             PDF_M+162, ry+5, { width:100, lineBreak:false, ellipsis:true })
+      .text(zahlart(o),                       PDF_M+264, ry+5, { width:72, lineBreak:false, ellipsis:true })
+      .text(grund(o),                         PDF_M+338, ry+5, { width:105, lineBreak:false, ellipsis:true });
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#222')
+      .text(pdfFmt(o.total||0), PDF_M+2, ry+5, { width:PDF_W-4, align:'right', lineBreak:false });
+    doc.y = ry + 18;
+    summe += (o.total||0);
+  });
+  if (doc.y > PDF_FT - 24) { doc.addPage(); doc.y = PDF_M; }
+  const sy = doc.y;
+  doc.save().fillOpacity(0.16).rect(PDF_M, sy, PDF_W, 20).fill('#9b2c2c').restore();
+  doc.font('Helvetica').fontSize(9).fillColor('#333').text(`Summe storniert (${stornos.length}, nicht im Umsatz):`, PDF_M+8, sy+5);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#333').text(pdfFmt(summe), PDF_M+2, sy+5, { width:PDF_W-4, align:'right' });
+  doc.y = sy + 20 + 10;
+}
+
 function pdfBarRechnung(doc, barOrders, barStats, zeitraum) {
   if (!barOrders.length) return;
   doc.addPage(); doc.y = PDF_M;
@@ -1871,7 +1925,7 @@ function getWeekNum(d) {
 // Cron und manueller Endpunkt rufen beide hier rein.
 function buildMonatsberichtPdf(doc, d) {
   const { monat, vonBis, orders, brutto, svcFees, auszahlung,
-          barOrdersM, barSvcM, barNettoM, barBetragM, weekRows } = d;
+          barOrdersM, barSvcM, barNettoM, barBetragM, weekRows, stornos = [] } = d;
 
   pdfColorBox(doc, `Monatsbericht ${monat}`, `Pizzeria La Scala  ·  ${vonBis}`, '#d32027');
   pdfKacheln(doc, [
@@ -1909,6 +1963,8 @@ function buildMonatsberichtPdf(doc, d) {
   doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a2e').text('KUNDENLISTE', PDF_M, doc.y);
   doc.y += 12;
   pdfKundenliste(doc, orders);
+  pdfHr(doc, '#bbb');
+  pdfStornoliste(doc, stornos);
   if (barOrdersM.length > 0) {
     pdfBarRechnung(doc, barOrdersM, { barSvc: barSvcM, barNetto: barNettoM, barBetrag: barBetragM }, vonBis);
   }
@@ -1940,6 +1996,8 @@ cron.schedule('0 22 * * *', async () => {
       createdAt: { $gte: mStart, $lte: mEnd }
     });
 
+    const stornos = await Order.find({ status: 'cancelled', createdAt: { $gte: mStart, $lte: mEnd } }).sort({ createdAt: 1 });
+
     const brutto     = orders.reduce((s,o) => s+(o.total||0), 0);
     const svcFees    = orders.reduce((s,o) => s+(o.serviceFee||PDF_SV), 0);
     const auszahlung = brutto - svcFees;
@@ -1961,7 +2019,7 @@ cron.schedule('0 22 * * *', async () => {
     // ── PDF: Monatsbericht (Kennzahlen + Kundenliste + Bar-Übersicht) ─────
     const monatsPdf = await generatePdf(doc => buildMonatsberichtPdf(doc, {
       monat, vonBis, orders, brutto, svcFees, auszahlung,
-      barOrdersM, barSvcM, barNettoM, barBetragM, weekRows,
+      barOrdersM, barSvcM, barNettoM, barBetragM, weekRows, stornos,
     }));
 
     // ── E-Mail: Restaurant + Inhaber ───────────────────────────────────────────
@@ -2074,6 +2132,8 @@ app.post('/api/admin/send-monthly', auth, async (req, res) => {
       createdAt: { $gte: mStart, $lte: mEnd }
     });
 
+    const stornos = await Order.find({ status: 'cancelled', createdAt: { $gte: mStart, $lte: mEnd } }).sort({ createdAt: 1 });
+
     const brutto     = orders.reduce((s,o) => s+(o.total||0), 0);
     const svcFees    = orders.reduce((s,o) => s+(o.serviceFee||PDF_SV), 0);
     const auszahlung = brutto - svcFees;
@@ -2087,7 +2147,7 @@ app.post('/api/admin/send-monthly', auth, async (req, res) => {
 
     const monatsPdf = await generatePdf(doc => buildMonatsberichtPdf(doc, {
       monat, vonBis, orders, brutto, svcFees, auszahlung,
-      barOrdersM, barSvcM, barNettoM, barBetragM, weekRows,
+      barOrdersM, barSvcM, barNettoM, barBetragM, weekRows, stornos,
     }));
 
     // ?nur=restaurant|inhaber|owner: Probelauf an nur eine Rolle
