@@ -58,7 +58,19 @@ async function paypalApi(path, method, token, body) {
 function getResend() {
   const key = process.env.RESEND_API_KEY;
   if (!key) { console.warn('⚠️  RESEND_API_KEY fehlt – E-Mails werden nicht gesendet'); return null; }
-  return new Resend(key);
+  const resend = new Resend(key);
+  // Alle Standorte teilen ein Resend-Konto (10 Mails pro Sekunde). Um 22:00 senden
+  // alle zugleich ihre Berichte, am 31.10.2026 gingen so drei Monatsberichte verloren.
+  // Bei rate_limit_exceeded deshalb kurz warten und erneut senden.
+  const senden = resend.emails.send.bind(resend.emails);
+  resend.emails.send = async (...args) => {
+    for (let versuch = 1; ; versuch++) {
+      const antwort = await senden(...args);
+      if (antwort?.error?.name !== 'rate_limit_exceeded' || versuch >= 6) return antwort;
+      await new Promise(r => setTimeout(r, 1000 * versuch + Math.random() * 1000));
+    }
+  };
+  return resend;
 }
 
 // ─── Eigene Adresse ──────────────────────────────────────────────
