@@ -1492,6 +1492,8 @@ function pdfTableRow(doc, cells, shade, bold = false) {
   doc.y = top + 20;
 }
 
+// Ohne Gastnamen: Die Berichte gehen per Mail an Inhaber und teils an den Steuerberater, dafuer reicht die
+// Bestellnummer (Datenminimierung, Abed 01.11.2026). Name und Kontaktdaten stehen nur im Dashboard.
 function pdfKundenliste(doc, orders) {
   function drawGroup(label, color, list) {
     if (!list.length) return;
@@ -1503,8 +1505,8 @@ function pdfKundenliste(doc, orders) {
     doc.y = gy + 22 + 2;
     const hy = doc.y;
     doc.rect(PDF_M, hy, PDF_W, 16).fill('#eaeef3');
-    [['#', PDF_M+2, 30, 'left'], ['Datum', PDF_M+34, 40, 'left'], ['Kunde', PDF_M+76, 190, 'left'],
-     ['Art', PDF_M+268, 80, 'left'], ['Betrag', PDF_M+2, PDF_W-4, 'right']
+    [['#', PDF_M+2, 30, 'left'], ['Datum', PDF_M+34, 40, 'left'],
+     ['Art', PDF_M+76, 80, 'left'], ['Betrag', PDF_M+2, PDF_W-4, 'right']
     ].forEach(([h, x, w, a]) => doc.font('Helvetica-Bold').fontSize(8).fillColor('#444').text(h, x, hy+4, { width:w, align:a }));
     doc.y = hy + 16 + 2;
     let sub = 0;
@@ -1512,15 +1514,13 @@ function pdfKundenliste(doc, orders) {
       // letzte Zeile nicht ohne ihre Summenzeile (20 pt) auf der alten Seite lassen
       if (doc.y > PDF_FT - (i === list.length - 1 ? 44 : 24)) { doc.addPage(); doc.y = PDF_M; }
       const date = new Date(o.createdAt).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }); // liefert schon "13.10."
-      const name = `${o.customer?.first||''} ${o.customer?.last||''}`.trim().substring(0, 28);
       const modeStr = o.mode === 'lieferung' ? 'Lieferung' : 'Abholung';
       const ry = doc.y;
       if (i % 2 === 0) doc.rect(PDF_M, ry, PDF_W, 18).fill('#fafafa');
       doc.font('Helvetica').fontSize(9).fillColor('#222')
         .text(`${o.orderNum}`, PDF_M+2,   ry+4, { width:30 })
         .text(date,            PDF_M+34,  ry+4, { width:40 })
-        .text(name,            PDF_M+76,  ry+4, { width:188 })
-        .text(modeStr,         PDF_M+268, ry+4, { width:80 });
+        .text(modeStr,         PDF_M+76,  ry+4, { width:80 });
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#222')
         .text(pdfFmt(o.total||0), PDF_M+2, ry+4, { width:PDF_W-4, align:'right' });
       doc.y = ry + 18;
@@ -1557,9 +1557,9 @@ function pdfStornoliste(doc, alle) {
   const zahlart = o => ({ bar:'Bar', karte:'EC-Karte', stripe:'Online', paypal:'PayPal' }[o.payment] || o.payment || '–')
     + (o.paymentStatus === 'refunded' ? ', erstattet' : '');
   const kurz = (s, n) => s.length > n ? s.substring(0, n - 1) + '…' : s; // eine Zeile je Storno, sonst ueberlappt die Summe
-  const grund = o => kurz(o.cancelReason || '–', 24);
+  const grund = o => kurz(o.cancelReason || '–', 40);
   const spalten = [['#', PDF_M+2, 30, 'left'], ['Bestellt', PDF_M+34, 62, 'left'], ['Storniert', PDF_M+98, 62, 'left'],
-    ['Kunde', PDF_M+162, 100, 'left'], ['Zahlart', PDF_M+264, 72, 'left'], ['Grund', PDF_M+338, 105, 'left'], ['Betrag', PDF_M+2, PDF_W-4, 'right']];
+    ['Zahlart', PDF_M+162, 80, 'left'], ['Grund', PDF_M+244, 199, 'left'], ['Betrag', PDF_M+2, PDF_W-4, 'right']];
   const kopf = () => {
     const hy = doc.y;
     doc.rect(PDF_M, hy, PDF_W, 16).fill('#f3e3e3');
@@ -1572,14 +1572,12 @@ function pdfStornoliste(doc, alle) {
     if (doc.y > PDF_FT - (i === stornos.length - 1 ? 44 : 24)) { doc.addPage(); doc.y = PDF_M; kopf(); }
     const ry = doc.y;
     if (i % 2 === 0) doc.rect(PDF_M, ry, PDF_W, 18).fill('#fafafa');
-    const name = `${o.customer?.first||''} ${o.customer?.last||''}`.trim().substring(0, 22);
     doc.font('Helvetica').fontSize(8).fillColor('#222')
       .text(`${o.orderNum}`,                PDF_M+2,   ry+5, { width:30, lineBreak:false })
       .text(zeit(o.createdAt),                PDF_M+34,  ry+5, { width:62, lineBreak:false })
       .text(zeit(o.updatedAt || o.createdAt), PDF_M+98,  ry+5, { width:62, lineBreak:false })
-      .text(name,                             PDF_M+162, ry+5, { width:100, lineBreak:false, ellipsis:true })
-      .text(zahlart(o),                       PDF_M+264, ry+5, { width:72, lineBreak:false, ellipsis:true })
-      .text(grund(o),                         PDF_M+338, ry+5, { width:105, lineBreak:false, ellipsis:true });
+      .text(zahlart(o),                       PDF_M+162, ry+5, { width:80, lineBreak:false, ellipsis:true })
+      .text(grund(o),                         PDF_M+244, ry+5, { width:199, lineBreak:false, ellipsis:true });
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#222')
       .text(pdfFmt(o.total||0), PDF_M+2, ry+5, { width:PDF_W-4, align:'right', lineBreak:false });
     doc.y = ry + 18;
@@ -1615,7 +1613,7 @@ function pdfBarRechnung(doc, barOrders, barStats, zeitraum) {
   doc.moveTo(PDF_M, doc.y).lineTo(PDF_M+PDF_W, doc.y).strokeColor('#333').lineWidth(1).stroke(); doc.y += 4;
   const th = doc.y;
   doc.rect(PDF_M, th, PDF_W, 16).fill('#1a1a2e');
-  [['#', PDF_M+2, 34, 'left'], ['Datum', PDF_M+38, 40, 'left'], ['Kunde', PDF_M+80, 170, 'left'],
+  [['#', PDF_M+2, 34, 'left'], ['Datum', PDF_M+38, 40, 'left'], ['Art', PDF_M+80, 170, 'left'],
    ['Umsatz', PDF_M+252, 64, 'right'], ['Servicegebühr', PDF_M+318, 118, 'right'], ['Gesamt', PDF_M+2, PDF_W-4, 'right']
   ].forEach(([h, x, w, a]) => doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#fff').text(h, x, th+4, { width:w, align:a }));
   doc.y = th + 16;
@@ -1623,13 +1621,13 @@ function pdfBarRechnung(doc, barOrders, barStats, zeitraum) {
     if (doc.y > PDF_FT - 20) { doc.addPage(); doc.y = PDF_M; }
     const sf   = o.serviceFee || PDF_SV;
     const date = new Date(o.createdAt).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }); // liefert schon "13.10."
-    const name = `${o.customer?.first||''} ${o.customer?.last||''}`.trim().substring(0, 24);
+    const art  = o.mode === 'lieferung' ? 'Lieferung' : 'Abholung';
     const ry = doc.y;
     if (i % 2 === 0) doc.rect(PDF_M, ry, PDF_W, 16).fill('#f8f9fc');
     doc.font('Helvetica').fontSize(8.5).fillColor('#222')
       .text(`${o.orderNum}`, PDF_M+2,  ry+4, { width:34 })
       .text(date,            PDF_M+38, ry+4, { width:40 })
-      .text(name,            PDF_M+80, ry+4, { width:168 })
+      .text(art,             PDF_M+80, ry+4, { width:168 })
       .text(pdfFmt(o.total), PDF_M+252, ry+4, { width:64,  align:'right' })
       .text(pdfFmt(sf),      PDF_M+318, ry+4, { width:118, align:'right' });
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#1a1a2e').text(pdfFmt(sf), PDF_M+2, ry+4, { width:PDF_W-4, align:'right' });
@@ -1817,7 +1815,7 @@ function buildWochenberichtPdf(doc, d) {
   doc.font('Helvetica-Bold').fontSize(13).fillColor('#2e7d32').text(pdfFmt(auszahlung), PDF_M+2, ay+8, { width: PDF_W-4, align: 'right' });
   doc.y = ay + 28 + 12;
   pdfHr(doc, '#bbb');
-  doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a2e').text('KUNDENLISTE', PDF_M, doc.y);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a2e').text('BESTELLLISTE', PDF_M, doc.y);
   doc.y += 12;
   pdfKundenliste(doc, orders);
   if (barOrders.length > 0) {
@@ -1888,7 +1886,7 @@ async function wochenberichtVersenden(now, { nurOwner = false } = {}) {
     <tr style="background:#f5f5f5"><td style="padding:8px">Servicegebühren (A. R. Falah)</td><td style="padding:8px;text-align:right">− ${svcFees.toFixed(2).replace('.',',')} €</td></tr>
     <tr style="background:#e8f5e9"><td style="padding:10px;font-weight:bold;color:#2e7d32;font-size:15px">Ihr Auszahlungsbetrag</td><td style="padding:10px;text-align:right;font-weight:bold;color:#2e7d32;font-size:15px">${auszahlung.toFixed(2).replace('.',',')} €</td></tr>
   </table>
-  <p style="font-size:11px;color:#aaa;margin-top:8px">Anbei der Wochenbericht mit Kundenliste${barOrders.length > 0 ? ' und Bar-Übersicht' : ''}.</p>
+  <p style="font-size:11px;color:#aaa;margin-top:8px">Anbei der Wochenbericht mit Bestellliste${barOrders.length > 0 ? ' und Bar-Übersicht' : ''}.</p>
 </div>
 </div>`,
       attachments: [{ filename: `KW${kw}_${now.getFullYear()}_La Scala_Wochenbericht.pdf`, content: berichtPdf.toString('base64') }],
@@ -1972,7 +1970,7 @@ function buildMonatsberichtPdf(doc, d) {
   });
   doc.y += 8;
   pdfHr(doc, '#bbb');
-  doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a2e').text('KUNDENLISTE', PDF_M, doc.y);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a2e').text('BESTELLLISTE', PDF_M, doc.y);
   doc.y += 12;
   pdfKundenliste(doc, orders);
   pdfHr(doc, '#bbb');
@@ -2028,7 +2026,7 @@ cron.schedule('0 22 * * *', async () => {
     });
     const weekRows = Object.entries(weeksMap).sort((a, b) => +a[0] - +b[0]);
 
-    // ── PDF: Monatsbericht (Kennzahlen + Kundenliste + Bar-Übersicht) ─────
+    // ── PDF: Monatsbericht (Kennzahlen + Bestellliste + Bar-Übersicht) ─────
     const monatsPdf = await generatePdf(doc => buildMonatsberichtPdf(doc, {
       monat, vonBis, orders, brutto, svcFees, auszahlung,
       barOrdersM, barSvcM, barNettoM, barBetragM, weekRows, stornos,
@@ -2058,7 +2056,7 @@ cron.schedule('0 22 * * *', async () => {
       <tr style="background:#f5f5f5"><td style="padding:8px">Servicegebühren (A. R. Falah)</td><td style="padding:8px;text-align:right">− ${svcFees.toFixed(2).replace('.',',')} €</td></tr>
       <tr style="background:#e8f5e9"><td style="padding:10px;font-weight:bold;color:#2e7d32;font-size:15px">Ihr Auszahlungsbetrag</td><td style="padding:10px;text-align:right;font-weight:bold;color:#2e7d32;font-size:15px">${auszahlung.toFixed(2).replace('.',',')} €</td></tr>
     </table>
-    <p style="font-size:11px;color:#aaa;margin-top:8px">Anbei der Monatsbericht mit Kundenliste${barOrdersM.length > 0 ? ' und Bar-Übersicht' : ''}.</p>
+    <p style="font-size:11px;color:#aaa;margin-top:8px">Anbei der Monatsbericht mit Bestellliste${barOrdersM.length > 0 ? ' und Bar-Übersicht' : ''}.</p>
   </div>
 </div>`,
         attachments: [{ filename: `${monat.replace(' ','_')}_La Scala_Monatsbericht.pdf`, content: monatsPdf.toString('base64') }],
