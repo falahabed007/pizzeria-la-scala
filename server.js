@@ -1455,6 +1455,7 @@ const PDF_FT = 790; // Unterkante fuer Tabellenzeilen. Der Textbereich endet bei
                     // reicht eine Zeile darueber, bricht pdfkit selbst um und jede Zelle landet auf eigener Seite.
 const PDF_SV = 0;
 const PDF_BASE = 150; // monatliche Grundgebühr (Fixmodell: 150 € + Servicegebühr/Bestellung)
+const PDF_DOMAIN = 0; // monatliche Domain-Kosten, separat ueber Lexware (Abed, 01.11.2026)
 const pdfFmt = n => n.toFixed(2).replace('.', ',') + ' €';
 
 function pdfColorBox(doc, title, sub, color = '#d32027', h = 70) {
@@ -1475,8 +1476,8 @@ function pdfKacheln(doc, items) {
   items.forEach(([label, value, color], i) => {
     const x = PDF_M + i * (kW + 8);
     doc.rect(x, top, kW, 46).fill(color);
-    doc.font('Helvetica').fontSize(7.5).fillColor('rgba(255,255,255,0.72)').text(label, x + 8, top + 8, { width: kW - 12 });
-    doc.font('Helvetica-Bold').fontSize(14).fillColor('#fff').text(value, x + 8, top + 22, { width: kW - 12 });
+    doc.font('Helvetica').fontSize(7.5).fillColor('#ffffff', 0.75).text(label, x + 8, top + 8, { width: kW - 12 }); // pdfkit kennt kein rgba()
+    doc.font('Helvetica-Bold').fontSize(14).fillColor('#fff', 1).text(value, x + 8, top + 22, { width: kW - 12 });
   });
   doc.y = top + 54;
 }
@@ -1589,6 +1590,92 @@ function pdfStornoliste(doc, alle) {
   doc.font('Helvetica').fontSize(9).fillColor('#333').text(`Summe storniert (${stornos.length}, nicht im Umsatz):`, PDF_M+8, sy+5);
   doc.font('Helvetica-Bold').fontSize(10).fillColor('#333').text(pdfFmt(summe), PDF_M+2, sy+5, { width:PDF_W-4, align:'right' });
   doc.y = sy + 20 + 10;
+}
+
+// Abrechnung im Monatsbericht (Abed, 01.11.2026), getrennt nach dem Weg, den das Geld nimmt: Online zahlt Stripe
+// direkt an den Laden aus, abzueglich Servicegebuehr und Stripe-Pauschale. Bar und EC-Karte liegen schon in der
+// Kasse. Grundgebuehr, Domain und die Servicegebuehr der Ladenzahlungen stellt FlueVate separat ueber Lexware in
+// Rechnung. Die Pauschale ist dieselbe Formel, die der Checkout als application_fee einbehaelt (1,5 % + 0,25 €).
+const stripePauschale = o => Math.round(((o.total || 0) * 0.015 + 0.25) * 100) / 100;
+function monatsAbrechnung(orders) {
+  const summe  = (liste, f) => Math.round(liste.reduce((s, o) => s + f(o), 0) * 100) / 100;
+  const svc    = o => o.serviceFee || PDF_SV;
+  const online = orders.filter(o => o.payment === 'stripe');
+  const laden  = orders.filter(o => o.payment !== 'stripe');
+  const a = {
+    nOnline: online.length, umsatzOnline: summe(online, o => o.total || 0),
+    svcOnline: summe(online, svc), stripeGeb: summe(online, stripePauschale),
+    nLaden: laden.length, umsatzLaden: summe(laden, o => o.total || 0), svcLaden: summe(laden, svc),
+    grund: PDF_BASE, domain: PDF_DOMAIN,
+  };
+  a.brutto    = a.umsatzOnline + a.umsatzLaden;
+  a.vonStripe = a.umsatzOnline - a.svcOnline - a.stripeGeb;
+  a.rechnung  = a.grund + a.domain + a.svcLaden;
+  a.gebuehren = a.svcOnline + a.stripeGeb + a.rechnung;
+  a.bleibt    = a.brutto - a.gebuehren;
+  return a;
+}
+// "13 × 0,99 €", solange jede Bestellung die Standardgebuehr traegt, sonst nur die Anzahl
+const svcText = (n, betrag) => Math.abs(betrag - n * PDF_SV) < 0.005 ? `${n} × ${pdfFmt(PDF_SV)}` : `${n} Bestellungen`;
+
+function pdfAbrechnung(doc, a) {
+  let zebra = false;
+  const zeile = (text, wert, bold = false) => {
+    if (bold) doc.rect(PDF_M, doc.y, PDF_W, 20).fill('#e6ecf3');
+    pdfTableRow(doc, [[text, PDF_M+8, PDF_W-110, 'left'], [wert, PDF_M+2, PDF_W-4, 'right']], zebra && !bold, bold);
+    zebra = !zebra;
+  };
+  const block = titel => {
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#666').text(titel, PDF_M, doc.y + 8, { width: PDF_W });
+    doc.y += 3; zebra = false;
+  };
+  const minus = n => '– ' + pdfFmt(n); // Helvetica (WinAnsi) hat kein U+2212
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a2e').text('ABRECHNUNG', PDF_M, doc.y);
+  block('UMSATZ');
+  zeile(`Bar / EC-Karte im Laden  (${a.nLaden} Bestellungen)`, pdfFmt(a.umsatzLaden));
+  if (a.nOnline) zeile(`Online über Stripe  (${a.nOnline} Bestellungen)`, pdfFmt(a.umsatzOnline));
+  zeile('Gesamtumsatz', pdfFmt(a.brutto), true);
+  if (a.nOnline) {
+    block('ONLINE – ZAHLT STRIPE DIREKT AN SIE AUS');
+    zeile('Online-Umsatz', pdfFmt(a.umsatzOnline));
+    zeile(`Servicegebühr FlueVate  (${svcText(a.nOnline, a.svcOnline)})`, minus(a.svcOnline));
+    zeile('Stripe-Gebühr  (1,5 % + 0,25 € je Zahlung)', minus(a.stripeGeb));
+    zeile('Von Stripe überwiesen', pdfFmt(a.vonStripe), true);
+  }
+  block('BAR / EC-KARTE – LIEGT BEREITS IN IHRER KASSE');
+  zeile(`${a.nLaden} Bestellungen`, pdfFmt(a.umsatzLaden), true);
+  block('RECHNUNG VON FLUEVATE  (separat über Lexware)');
+  if (a.grund)  zeile('Grundgebühr (monatlich)', pdfFmt(a.grund));
+  if (a.domain) zeile('Domain (monatlich)', pdfFmt(a.domain));
+  if (a.nLaden) zeile(`Servicegebühr Bar / EC-Karte  (${svcText(a.nLaden, a.svcLaden)})`, pdfFmt(a.svcLaden));
+  zeile('Rechnungsbetrag', pdfFmt(a.rechnung), true);
+  doc.y += 8;
+  const ay = doc.y;
+  doc.rect(PDF_M, ay, PDF_W, 28).fill('#e8f5e9');
+  doc.font('Helvetica-Bold').fontSize(12).fillColor('#2e7d32').text('Ihnen bleiben nach allen Gebühren', PDF_M+10, ay+8, { width: PDF_W*0.65 });
+  doc.font('Helvetica-Bold').fontSize(13).fillColor('#2e7d32').text(pdfFmt(a.bleibt), PDF_M+2, ay+8, { width: PDF_W-4, align: 'right' });
+  doc.y = ay + 28 + 3;
+  doc.font('Helvetica').fontSize(7.5).fillColor('#888')
+    .text(`Gesamtumsatz ${pdfFmt(a.brutto)} – Gebühren ${pdfFmt(a.gebuehren)} (Servicegebühren, Stripe-Gebühr, Rechnung FlueVate)`, PDF_M+10, doc.y, { width: PDF_W-20 });
+  doc.y += 14;
+}
+
+// Dieselben Zahlen fuer die Mail an Inhaber (Tabellenzeilen) und an Abed (Fliesstext)
+function abrechnungMailZeilen(a) {
+  const eur = n => n.toFixed(2).replace('.', ',') + ' €';
+  const td = 'style="padding:8px"', tdr = 'style="padding:8px;text-align:right"';
+  return `<tr><td ${td}>Gesamtumsatz (Brutto)</td><td ${tdr}>${eur(a.brutto)}</td></tr>`
+    + (a.nOnline ? `<tr style="background:#f5f5f5"><td ${td}>Von Stripe überwiesen (nach Servicegebühr und Stripe-Gebühr)</td><td ${tdr}>${eur(a.vonStripe)}</td></tr>` : '')
+    + `<tr><td ${td}>Bar / EC-Karte in Ihrer Kasse</td><td ${tdr}>${eur(a.umsatzLaden)}</td></tr>`
+    + `<tr style="background:#f5f5f5"><td ${td}>Rechnung FlueVate (separat über Lexware)</td><td ${tdr}>− ${eur(a.rechnung)}</td></tr>`
+    + `<tr style="background:#e8f5e9"><td style="padding:10px;font-weight:bold;color:#2e7d32;font-size:15px">Ihnen bleiben nach allen Gebühren</td><td style="padding:10px;text-align:right;font-weight:bold;color:#2e7d32;font-size:15px">${eur(a.bleibt)}</td></tr>`;
+}
+function abrechnungOwnerText(a) {
+  const eur = n => n.toFixed(2).replace('.', ',') + ' €';
+  const teile = [a.grund && `Grundgebühr ${eur(a.grund)}`, a.domain && `Domain ${eur(a.domain)}`,
+    a.nLaden && `Servicegebühr Bar/EC ${eur(a.svcLaden)} (${a.nLaden})`].filter(Boolean).join(', ');
+  return `<b>Rechnung über Lexware:</b> ${eur(a.rechnung)}${teile ? ` (${teile})` : ''}`
+    + (a.nOnline ? `<br><b>Über Stripe einbehalten:</b> Servicegebühr ${eur(a.svcOnline)} (${a.nOnline}) + Stripe-Pauschale ${eur(a.stripeGeb)}` : '');
 }
 
 function pdfBarRechnung(doc, barOrders, barStats, zeitraum) {
@@ -1946,17 +2033,9 @@ function buildMonatsberichtPdf(doc, d) {
   ]);
   doc.moveDown(0.4);
   pdfHr(doc);
-  doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a2e').text('ABRECHNUNG', PDF_M, doc.y);
-  doc.y += 14;
-  pdfTableRow(doc, [[`Servicegebühren  (${pdfFmt(PDF_SV)} × ${orders.length} Bestellungen)`, PDF_M+8, PDF_W-80, 'left'], [pdfFmt(svcFees), PDF_M+2, PDF_W-4, 'right']], false);
-  pdfTableRow(doc, [['Grundgebühr (monatlich)', PDF_M+8, PDF_W-80, 'left'], [pdfFmt(PDF_BASE), PDF_M+2, PDF_W-4, 'right']], true);
-  pdfTableRow(doc, [['Gesamt FlueVate-Gebühren', PDF_M+8, PDF_W-80, 'left'], [pdfFmt(svcFees + PDF_BASE), PDF_M+2, PDF_W-4, 'right']], false, true);
-  doc.y += 4;
-  const ay = doc.y;
-  doc.rect(PDF_M, ay, PDF_W, 28).fill('#e8f5e9');
-  doc.font('Helvetica-Bold').fontSize(12).fillColor('#2e7d32').text('Auszahlung an Pizzeria La Scala', PDF_M+10, ay+8, { width: PDF_W*0.65 });
-  doc.font('Helvetica-Bold').fontSize(13).fillColor('#2e7d32').text(pdfFmt(auszahlung), PDF_M+2, ay+8, { width: PDF_W-4, align: 'right' });
-  doc.y = ay + 28 + 16;
+  pdfAbrechnung(doc, monatsAbrechnung(orders));
+  doc.y += 6;
+  if (doc.y > PDF_FT - (weekRows.length * 20 + 40)) { doc.addPage(); doc.y = PDF_M; }
   pdfHr(doc, '#bbb');
   doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a2e').text('WOCHENÜBERSICHT', PDF_M, doc.y);
   doc.y += 14;
@@ -1969,6 +2048,7 @@ function buildMonatsberichtPdf(doc, d) {
     ], i % 2 === 1);
   });
   doc.y += 8;
+  if (doc.y > PDF_FT - 130) { doc.addPage(); doc.y = PDF_M; }
   pdfHr(doc, '#bbb');
   doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a2e').text('BESTELLLISTE', PDF_M, doc.y);
   doc.y += 12;
@@ -2011,6 +2091,7 @@ cron.schedule('0 22 * * *', async () => {
     const brutto     = orders.reduce((s,o) => s+(o.total||0), 0);
     const svcFees    = orders.reduce((s,o) => s+(o.serviceFee||PDF_SV), 0);
     const auszahlung = brutto - svcFees;
+    const a = monatsAbrechnung(orders);
     const barOrdersM = orders.filter(o => o.payment === 'bar');
     const barSvcM    = barOrdersM.reduce((s,o) => s+(o.serviceFee||PDF_SV), 0);
     const barNettoM  = barOrdersM.reduce((s,o) => s+(o.total||0), 0) - barSvcM;
@@ -2052,9 +2133,7 @@ cron.schedule('0 22 * * *', async () => {
   <div style="padding:24px 28px">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <tr style="background:#f5f5f5"><td style="padding:8px">Bestellungen gesamt</td><td style="padding:8px;text-align:right"><b>${orders.length}</b></td></tr>
-      <tr><td style="padding:8px">Gesamtumsatz (Brutto)</td><td style="padding:8px;text-align:right">${brutto.toFixed(2).replace('.',',')} €</td></tr>
-      <tr style="background:#f5f5f5"><td style="padding:8px">Servicegebühren (A. R. Falah)</td><td style="padding:8px;text-align:right">− ${svcFees.toFixed(2).replace('.',',')} €</td></tr>
-      <tr style="background:#e8f5e9"><td style="padding:10px;font-weight:bold;color:#2e7d32;font-size:15px">Ihr Auszahlungsbetrag</td><td style="padding:10px;text-align:right;font-weight:bold;color:#2e7d32;font-size:15px">${auszahlung.toFixed(2).replace('.',',')} €</td></tr>
+      ${abrechnungMailZeilen(a)}
     </table>
     <p style="font-size:11px;color:#aaa;margin-top:8px">Anbei der Monatsbericht mit Bestellliste${barOrdersM.length > 0 ? ' und Bar-Übersicht' : ''}.</p>
   </div>
@@ -2072,7 +2151,7 @@ cron.schedule('0 22 * * *', async () => {
         to: process.env.OWNER_EMAIL,
         subject: `📅 Monatsbericht ${monat} · Pizzeria La Scala`,
         html: `<p style="font-family:Arial,sans-serif;color:#555">Anbei der Monatsbericht <b>${monat}</b> für Pizzeria La Scala.</p>
-               <p style="font-family:Arial,sans-serif;color:#555"><b>Zeitraum:</b> ${vonBis}<br><b>Grundgebühr:</b> ${PDF_BASE.toFixed(2).replace('.',',')} €<br><b>Servicegebühren:</b> ${svcFees.toFixed(2).replace('.',',')} €<br><b>Gesamt-Gebühren:</b> ${(svcFees + PDF_BASE).toFixed(2).replace('.',',')} €${barOrdersM.length > 0 ? `<br><b>davon Bar:</b> ${barBetragM.toFixed(2).replace('.',',')} € (${barOrdersM.length} Barzahlungen)` : ''}</p>
+               <p style="font-family:Arial,sans-serif;color:#555"><b>Zeitraum:</b> ${vonBis}<br>${abrechnungOwnerText(a)}</p>
                <p style="font-family:Arial,sans-serif;color:#999;font-size:12px">Die Gebühren-Rechnung wird separat über Lexware gestellt.</p>`,
         attachments: [
           { filename: `${monat.replace(' ','_')}_La Scala_Monatsbericht.pdf`, content: monatsPdf.toString('base64') },
@@ -2147,6 +2226,7 @@ app.post('/api/admin/send-monthly', auth, async (req, res) => {
     const brutto     = orders.reduce((s,o) => s+(o.total||0), 0);
     const svcFees    = orders.reduce((s,o) => s+(o.serviceFee||PDF_SV), 0);
     const auszahlung = brutto - svcFees;
+    const a = monatsAbrechnung(orders);
     const barOrdersM = orders.filter(o => o.payment === 'bar');
     const barSvcM    = barOrdersM.reduce((s,o) => s+(o.serviceFee||PDF_SV), 0);
     const barNettoM  = barOrdersM.reduce((s,o) => s+(o.total||0), 0) - barSvcM;
@@ -2173,7 +2253,7 @@ app.post('/api/admin/send-monthly', auth, async (req, res) => {
         to:   an,
         ...(cc.length ? { cc } : {}),
         subject: `📅 Monatsbericht ${monat} · Pizzeria La Scala`,
-        html: `<p style="font-family:Arial,sans-serif">Monatsbericht für <b>${monat}</b>.<br>${orders.length} Bestellungen · Auszahlung: ${auszahlung.toFixed(2).replace('.',',')} €</p>`,
+        html: `<p style="font-family:Arial,sans-serif">Monatsbericht für <b>${monat}</b>.<br>${orders.length} Bestellungen</p><table style="width:100%;max-width:560px;border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px">${abrechnungMailZeilen(a)}</table>`,
         attachments: [{ filename: `${monat.replace(' ','_')}_La Scala_Monatsbericht.pdf`, content: monatsPdf.toString('base64') }],
       });
       if (!antwort || antwort.error) console.error(`Monatsbericht an ${rolle} nicht versendet:`, antwort?.error || 'kein RESEND_API_KEY');
@@ -2185,7 +2265,7 @@ app.post('/api/admin/send-monthly', auth, async (req, res) => {
         to: process.env.OWNER_EMAIL,
         subject: `📅 Monatsbericht ${monat} · Pizzeria La Scala`,
         html: `<p style="font-family:Arial,sans-serif;color:#555">Manuell ausgelöst: Monatsbericht <b>${monat}</b>.</p>
-               <p style="font-family:Arial,sans-serif;color:#555"><b>Zeitraum:</b> ${vonBis}<br><b>Grundgebühr:</b> ${PDF_BASE.toFixed(2).replace('.',',')} €<br><b>Servicegebühren:</b> ${svcFees.toFixed(2).replace('.',',')} €<br><b>Gesamt-Gebühren:</b> ${(svcFees + PDF_BASE).toFixed(2).replace('.',',')} €${barOrdersM.length > 0 ? `<br><b>davon Bar:</b> ${barBetragM.toFixed(2).replace('.',',')} € (${barOrdersM.length} Barzahlungen)` : ''}</p>
+               <p style="font-family:Arial,sans-serif;color:#555"><b>Zeitraum:</b> ${vonBis}<br>${abrechnungOwnerText(a)}</p>
                <p style="font-family:Arial,sans-serif;color:#999;font-size:12px">Die Gebühren-Rechnung wird separat über Lexware gestellt.</p>`,
         attachments: [
           { filename: `${monat.replace(' ','_')}_La Scala_Monatsbericht.pdf`, content: monatsPdf.toString('base64') },
