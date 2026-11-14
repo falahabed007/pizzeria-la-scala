@@ -1200,7 +1200,7 @@ async function sendConfirmationEmail(order, mins) {
         <div style="background:#f7f3ee;padding:14px;text-align:center;font-size:11px;color:#999">Pizzeria La Scala · Ludgeristraße 62 · 59379 Selm · Tel: 0 25 92 / 9 78 93 30</div>
       </div>`
     });
-    console.log(`📧 Bestätigung → ${order.customer.email}`);
+    console.log(`📧 Bestätigung → Bestellung #${order.orderNum}`);
   } catch(e) { console.error('Mail Fehler:', e); }
 }
 
