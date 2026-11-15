@@ -3014,7 +3014,7 @@ async function processOrder() {
 
 // ─── KUNDE: WARTEN AUF DIE ANNAHME DURCH DAS RESTAURANT ──────────
 // Nach dem Absenden sieht der Kunde einen Wartebildschirm. Das "Okay" gibt es
-// erst, wenn das Restaurant die Bestellung im Dashboard angenommen hat.
+// erst, wenn das Restaurant die Bestellung in der App angenommen hat.
 const KONTAKT_TEL_HREF = 'tel:+4925929789330';
 const KONTAKT_TEL_TEXT = '0 25 92 / 9 78 93 30';
 const WARTE_INTERVALL  = 3000;           // Abstand zweier Statusabfragen
@@ -3176,7 +3176,7 @@ function warteWiederaufnehmen() {
 }
 
 // Mobile Browser drosseln Timer im Hintergrund stark -- beim Zurueckkehren
-// sofort einmal nachfragen. Das Dashboard macht es genauso.
+// sofort einmal nachfragen.
 document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && warteTimer) {
         clearInterval(warteTimer);
@@ -3200,7 +3200,7 @@ window.addEventListener('load', async () => {
         renderWarenkorb();
         window.history.replaceState({}, document.title, window.location.pathname);
         // Bis die Zahlung verbucht ist, steht die Bestellung auf 'awaiting_payment'
-        // und ist im Dashboard noch gar nicht sichtbar. Das sagen wir auch so.
+        // und ist in der App noch gar nicht sichtbar. Das sagen wir auch so.
         document.getElementById('dankeOrderId').textContent = orderNum ? '#' + orderNum : orderId;
         document.getElementById('dankeModal').style.display = 'flex';
         zeigeBestellZustand('', 'Zahlung wird geprüft…',
