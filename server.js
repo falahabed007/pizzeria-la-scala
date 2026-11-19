@@ -10,6 +10,7 @@ const jwt        = require('jsonwebtoken');
 const crypto     = require('crypto');
 const fs         = require('fs');
 const { webBestellungAusRequest } = require('./bestellung');
+const { kasseAnmerkung } = require('./kasse');
 require('dotenv').config();
 
 const app  = express();
@@ -934,6 +935,10 @@ app.post('/api/admin/login', async (req, res) => {
   const token = jwt.sign({ role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '30d' });
   res.json({ token });
 });
+
+// Kassen-App druckt bei Artikeln mit Extras nur die Extras -- die Anmerkung
+// am Artikel geht deshalb als Extra mit (kasse.js).
+app.use('/api/admin/orders', kasseAnmerkung());
 
 // ── Pending Bestellungen (für 5s Polling) ───────────────────────
 app.get('/api/admin/orders/pending', auth, async (req, res) => {
