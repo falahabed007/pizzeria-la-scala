@@ -24,7 +24,7 @@ const WEB_ZAHLARTEN = ['bar'];
 const GESPERRTE_FELDER = [
   '_id', '__v', 'id', 'createdAt', 'updatedAt',
   'orderNum', 'status', 'paymentStatus', 'source', 'statusToken', 'userId',
-  'prepTime', 'cancelReason', 'nachgeholt',
+  'prepTime', 'cancelReason', 'nachgeholt', 'zahlungAbgelaufen',
   'stripeSessionId', 'stripePaymentIntentId', 'paypalOrderId', 'paypalCaptureId',
   // Betrag rechnet die Route selbst; Rabatt und Gutschein gibt es bei
   // La Scala nicht, die Bestellseite schickt sie auch nicht.

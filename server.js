@@ -23,38 +23,17 @@ function getStripe() {
   return Stripe(key);
 }
 
-// ─── PayPal (REST v2, lazy) ──────────────────────────────────────
-// Unabhängig von Stripe: eigene ENV-Keys, eigene Endpunkte.
-// PAYPAL_ENV=live → Produktion, sonst Sandbox.
-function paypalBase() {
-  return process.env.PAYPAL_ENV === 'live'
-    ? 'https://api-m.paypal.com'
-    : 'https://api-m.sandbox.paypal.com';
-}
-async function getPaypalAccessToken() {
-  const id = process.env.PAYPAL_CLIENT_ID, secret = process.env.PAYPAL_CLIENT_SECRET;
-  if (!id || !secret) throw new Error('PAYPAL_CLIENT_ID/PAYPAL_CLIENT_SECRET nicht gesetzt');
-  const auth = Buffer.from(`${id}:${secret}`).toString('base64');
-  const r = await fetch(`${paypalBase()}/v1/oauth2/token`, {
-    method: 'POST',
-    headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'grant_type=client_credentials'
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error('PayPal Auth: ' + (data.error_description || r.status));
-  return data.access_token;
-}
-async function paypalApi(path, method, token, body) {
-  const r = await fetch(`${paypalBase()}${path}`, {
-    method,
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {})
-  });
-  const text = await r.text();
-  const data = text ? JSON.parse(text) : {};
-  if (!r.ok) throw new Error(`PayPal API ${path}: ` + (data.message || data.error_description || r.status));
-  return data;
-}
+// ─── PayPal (REST v2, direkt auf das PayPal-Konto des Ladens) ────
+// Unabhängig von Stripe: eigene ENV-Keys, eigene Endpunkte. Nur PAYPAL_ENV=live,
+// die Sandbox wird nie angesprochen (frueher fiel der Code ohne PAYPAL_ENV=live auf
+// die Sandbox zurueck). Schalter, Abgleich, Webhook und Wachhund stehen in
+// paypal-direkt.js (Vorlage Odi's Bowl Ahaus, Tests ohne Datenbank:
+// test/paypal-direkt.test.js).
+const PaypalDirekt = require('./paypal-direkt');
+// Client lazy - liest die Variablen bei jedem Aufruf
+function paypalClient() { return PaypalDirekt.erstelleClient({ env: process.env }); }
+async function getPaypalAccessToken() { return paypalClient().token(); }
+async function paypalApi(path, method, token, body) { return paypalClient().aufruf(path, method, token, body); }
 
 // Resend lazy – kein Crash beim Start wenn Key fehlt
 function getResend() {
@@ -80,6 +59,11 @@ function getResend() {
 // getippt, waehrend FRONTEND_URL zwar in .env und render.yaml stand, aber
 // nie gelesen wurde - ein Umzug haette funf Stellen stumm veralten lassen.
 const FRONTEND = process.env.FRONTEND_URL || 'https://pizzerialascala.de';
+// Oeffentliche Adresse DIESES Backends (dieselbe wie window.FLUEVATE_BACKEND in
+// config.js). Daraus baut der Server die PayPal-Webhook-Adresse
+// <API_BASIS>/api/paypal-webhook (paypal-direkt.js: webhookAdresse). Bewusst nie aus
+// Anfrage-Kopfzeilen abgeleitet. Ueberschreibbar mit PUBLIC_API_URL.
+const API_BASIS = (process.env.PUBLIC_API_URL || '').trim() || 'https://api.pizzerialascala.de';
 
 // ─── CORS ────────────────────────────────────────────────────────
 const allowedOrigins = [
@@ -173,6 +157,10 @@ const orderSchema = new mongoose.Schema({
   stripePaymentIntentId:String,
   paypalOrderId:        String,
   paypalCaptureId:      String,
+  // PayPal-Zahlung nie bezahlt und vom Wachhund abgeschlossen (status cancelled, kein
+  // Storno). Nur so markierte Bestellungen darf ein gerade noch durchgelaufener Einzug
+  // wieder einbuchen (Wettlauf Rueckkehr/Aufraeumen, paypal-direkt.js).
+  zahlungAbgelaufen:    Boolean,
   prepTime:             Number,
   cancelReason:         { type: String, default: '' },
   customer: {
@@ -210,7 +198,13 @@ const settingsSchema = new mongoose.Schema({
   mode:           { type: String, default: 'online', enum: ['online','geschlossen','neutral'] },
   manualOverride: { type: Boolean, default: false },
   // Rückwärtskompatibilität
-  isOpen:         { type: Boolean, default: true }
+  isOpen:         { type: Boolean, default: true },
+  // Nur im eigenen Eintrag _id 'paypal' (nie in 'restaurant'): der Webhook, den der
+  // Server in der PayPal-App sichergestellt hat (paypal-direkt.js, erstelleWebhookVerwalter).
+  // app ist eine Kennung aus der Client-ID (Hash), nicht die Client-ID selbst.
+  paypalWebhook:  { type: new mongoose.Schema({
+    id: String, url: String, app: String, ereignisse: [String], am: Date,
+  }, { _id: false }), default: undefined },
 });
 const Settings = mongoose.model('Settings', settingsSchema);
 
@@ -237,6 +231,75 @@ async function getNextOrderNum() {
     { $inc: { seq: 1 } }, { new: true, upsert: true });
   return r.seq + 1000;
 }
+
+// ─── PayPal: nur direkt auf das PayPal-Konto des Ladens ──────────
+// Je Laden nur ZWEI Werte: PAYPAL_CLIENT_ID und PAYPAL_CLIENT_SECRET der Live-App.
+// Scharf geschaltet wird bewusst mit PAYPAL_ENV=live. Eingerichtet ist PayPal erst,
+// wenn zusaetzlich die Probe-Anmeldung (Token holen) gelingt UND ein Webhook bekannt
+// ist. Den stellt der Server selbst in der PayPal-App sicher (paypalWebhook unten) und
+// merkt sich die ID in Settings('paypal'); PAYPAL_WEBHOOK_ID (von Hand) hat Vorrang.
+// Probe: Erfolg 5 Minuten, Fehler 1 Minute zwischengespeichert, hoechstens 4 s, wirft nie.
+// Zustand fuer den Betreiber: GET /api/admin/paypal. Vorher: fuer Gaeste unsichtbar
+// (/api/config paypal:false), alle PayPal-Routen lehnen ab.
+let paypalProbe = null;   // { ok, grund } der letzten Probe-Anmeldung, nur fuer die Statusauskunft
+const paypalPruefer = PaypalDirekt.erstelleProbe({
+  abrufen: async () => { await paypalClient().token(); paypalProbe = { ok: true }; return true; },
+  melden:  e => { paypalProbe = { ok: false, grund: e.message };
+                  console.warn('PayPal-Probe-Anmeldung fehlgeschlagen, PayPal aus:', e.message); },
+});
+const PAYPAL_WEBHOOK_ADRESSE = PaypalDirekt.webhookAdresse(API_BASIS);   // { url } oder { fehler }
+const paypalWebhook = PaypalDirekt.erstelleWebhookVerwalter({
+  env: process.env, client: paypalClient(), apiBasis: API_BASIS,
+  // Eigener Eintrag _id 'paypal' in Settings, getrennt vom Laden-Zustand 'restaurant'
+  ablage: {
+    async lesen() { const s = await Settings.findById('paypal').lean(); return (s && s.paypalWebhook) || null; },
+    async schreiben(w) {
+      await Settings.updateOne({ _id: 'paypal' }, { $set: { paypalWebhook: w } }, { upsert: true, setDefaultsOnInsert: false });
+    },
+    async loeschen() { await Settings.updateOne({ _id: 'paypal' }, { $unset: { paypalWebhook: 1 } }); },
+  },
+});
+async function paypalBereit() {
+  paypalWebhook.anstossen();   // nur wenn faellig, im Hintergrund - die Anfrage wartet nie darauf
+  return PaypalDirekt.paypalBereit({ env: process.env, istBereit: paypalPruefer, webhookId: paypalWebhook.id() });
+}
+// Woran es liegt, wenn PayPal aus ist (fuer die Logzeile beim Start)
+function paypalAusGrund() {
+  const w = paypalWebhook.zustand();
+  if (!w.vorhanden) return `kein Webhook bekannt (${w.fehler || 'noch nicht sichergestellt'})`;
+  if (paypalProbe && !paypalProbe.ok) return `Anmeldung bei PayPal scheitert (${paypalProbe.grund})`;
+  return 'Probe-Anmeldung noch offen';
+}
+{
+  const pk = PaypalDirekt.paypalKonfiguration(process.env);
+  if (pk.zugang) {
+    console.log(`💙 PayPal: Schluessel gesetzt, PAYPAL_ENV=live. Webhook ${pk.webhookVorgabe
+      ? 'von Hand (PAYPAL_WEBHOOK_ID)'
+      : 'wird sichergestellt: ' + (PAYPAL_WEBHOOK_ADRESSE.url || PAYPAL_WEBHOOK_ADRESSE.fehler)}`);
+    paypalWebhook.sicherstellen()
+      .then(() => paypalBereit())
+      .then(ok => console.log(ok
+        ? '💙 PayPal (live) eingerichtet: PayPal wird angeboten'
+        : `⚠️  PayPal bleibt aus: ${paypalAusGrund()}. Zustand: GET /api/admin/paypal`))
+      .catch(e => console.error('PayPal-Start:', e.message));
+  } else if (pk.schluessel && !pk.live) {
+    console.warn('⚠️  PayPal-Schluessel eingetragen, aber PAYPAL_ENV ist nicht "live": PayPal bleibt aus '
+      + '(bewusster Schalter, es geht keine Anfrage an PayPal).');
+  } else if (pk.teilweise) {
+    console.warn(`⚠️  PayPal nur teilweise eingerichtet, es fehlt: ${pk.fehlend.join(', ')}. PayPal bleibt aus.`);
+  } else {
+    console.log('💙 PayPal nicht eingerichtet: wird nicht angeboten');
+  }
+}
+
+// ─── Kasse: unbezahlte PayPal-Bestellungen nie zeigen ────────────
+// Eine PayPal-Bestellung liegt vor der Zahlung als awaiting_payment in der Datenbank,
+// eine nie bezahlte wird zu cancelled mit paymentStatus 'pending' (Wachhund). Beides
+// gehoert weder in die Kasse noch in die Historie, auch nicht als Storno. Der Filter
+// trifft NUR payment 'paypal' - fuer Stripe und bar liefern alle Abfragen genau das,
+// was sie vorher geliefert haben (test/paypal-kasse.test.js).
+// Jede Order-Abfrage einer /api/admin/-Route mit Bestelllisten nimmt ihn als erstes Feld.
+const FUER_KASSE_PAYPAL = { $nor: [{ payment: 'paypal', paymentStatus: { $nin: ['paid', 'refunded'] } }] };
 
 // ─── Admin Auth ───────────────────────────────────────────────────
 // Zeitkonstanter Vergleich: ein normales === verraet ueber die Laufzeit,
@@ -455,18 +518,27 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get('/api/config', (req, res) => res.json({
-  whatsapp: process.env.WHATSAPP_NUMBER || '',
-  serviceFee: 0,
-  deliveryCities: {
-    'Selm-Bork':   { min: 12.00, fee: 0 },
-    'Südkirchen':  { min: 20.00, fee: 0 },
-    'Nordkirchen': { min: 20.00, fee: 0 },
-    'Vinnum':      { min: 20.00, fee: 0 },
-    'Cappenberg':  { min: 20.00, fee: 0 },
-    'Lüdinghausen':{ min: 20.00, fee: 0 },
-  }
-}));
+// paypal: ob PayPal eingerichtet ist (Client-ID und Secret, PAYPAL_ENV=live, Webhook
+// bekannt, Probe-Anmeldung gelingt), hoechstens 4 s und zwischengespeichert, wirft nie.
+// Ohne PAYPAL_ENV=live geht dabei keine Anfrage an PayPal. Nur mit paypal:true zeigt
+// die Bestellseite PayPal an. Die uebrigen Felder sind unveraendert.
+app.get('/api/config', async (req, res) => {
+  let paypal = false;
+  try { paypal = (await paypalBereit()) === true; } catch { paypal = false; }
+  res.json({
+    whatsapp: process.env.WHATSAPP_NUMBER || '',
+    serviceFee: 0,
+    deliveryCities: {
+      'Selm-Bork':   { min: 12.00, fee: 0 },
+      'Südkirchen':  { min: 20.00, fee: 0 },
+      'Nordkirchen': { min: 20.00, fee: 0 },
+      'Vinnum':      { min: 20.00, fee: 0 },
+      'Cappenberg':  { min: 20.00, fee: 0 },
+      'Lüdinghausen':{ min: 20.00, fee: 0 },
+    },
+    paypal,
+  });
+});
 
 // ── Restaurant Status (öffentlich) ───────────────────────────────
 app.get('/api/status', async (req, res) => {
@@ -701,126 +773,172 @@ app.post('/api/verify-payment', async (req, res) => {
 });
 
 // ── PayPal Checkout ───────────────────────────────────────────────
+// Prueft alles, was create-stripe-checkout dieses Standorts prueft, und mehr:
+//  - PayPal bereit (sonst 503 mit paypal:false, die Seite nimmt PayPal dann heraus)
+//  - Felder einzeln uebernommen wie bei Stripe (items, subtotal, deliveryFee,
+//    serviceFee, customer, mode, note) - gesperrte Felder setzt nur der Server
+//  - Lieferung nur in der Lieferzeit (lieferungMoeglich, wie Stripe und /api/orders)
+//  - Betrag vom Server gerechnet, genau wie bei Stripe: subtotal + Liefergebuehr +
+//    Servicegebuehr (La Scala hat keinen Gutschein-Code)
+//  - zusaetzlich: Warenkorb passt zu subtotal (betragPruefen; bei PayPal gibt es keine
+//    Einzelposten, die PayPal selbst summiert) und die Bestellung ist gueltig, BEVOR
+//    PayPal gefragt wird (Schema: mode, Pflichtfelder)
+// Liefergebiet/Mindestbestellwert prueft auch die Stripe-Route hier nicht serverseitig
+// (nur die Seite) - bewusst gleich gehalten.
+// Eingezogen wird der gespeicherte Gesamtbetrag (EUR, 2 Stellen).
+const PAYPAL_AUS = 'PayPal ist derzeit nicht möglich. Bitte wähle eine andere Zahlungsart.';
+const LADEN_NAME = 'Pizzeria La Scala';
+
 app.post('/api/create-paypal-order', async (req, res) => {
   try {
-    const { items, subtotal, deliveryFee, serviceFee, customer, mode, note } = req.body;
+    if (!(await paypalBereit())) return res.status(503).json({ message: PAYPAL_AUS, paypal: false });
+    const { items, subtotal, deliveryFee, serviceFee, customer, mode, note } = req.body || {};
+    // create-stripe-checkout liest customer.email und scheitert ohne customer
+    if (!customer || typeof customer !== 'object' || Array.isArray(customer)) {
+      return res.status(400).json({ message: 'Bitte gib deine Kontaktdaten an.' });
+    }
     if (mode === 'lieferung' && !lieferungMoeglich()) return res.status(400).json({ message: LIEFERZEIT_FEHLER });
-    const orderNum = await getNextOrderNum();
 
     const total  = Math.round((
       (Number(subtotal) || 0) + (Number(deliveryFee) || 0) + (Number(serviceFee) || 0)
     ) * 100) / 100;
+    const betragFehler = PaypalDirekt.betragPruefen({ items, subtotal, total });
+    if (betragFehler) return res.status(400).json({ message: betragFehler });
 
     // Zugriffsschluessel schon hier erzeugen: die return_url wird gebaut,
     // bevor die Bestellung existiert, und muss ihn mitfuehren.
     const statusToken = crypto.randomBytes(9).toString('base64url');
-
-    const token = await getPaypalAccessToken();
-    const ppOrder = await paypalApi('/v2/checkout/orders', 'POST', token, {
-      intent: 'CAPTURE',
-      purchase_units: [{
-        reference_id: String(orderNum),
-        custom_id:    String(orderNum),
-        description:  `Pizzeria La Scala Bestellung #${orderNum}`,
-        amount: { currency_code: 'EUR', value: Number(total).toFixed(2) }
-      }],
-      application_context: {
-        brand_name:          'Pizzeria La Scala',
-        locale:              'de-DE',
-        user_action:         'PAY_NOW',
-        shipping_preference: 'NO_SHIPPING',
-        return_url: `${FRONTEND}?order=${orderNum}&t=${statusToken}&paypal=1`,
-        cancel_url: `${FRONTEND}?payment=cancelled`,
-      }
-    });
-
-    const approve = (ppOrder.links || []).find(l => l.rel === 'approve' || l.rel === 'payer-action');
-
     const order = new Order({
       items, subtotal, deliveryFee, serviceFee, total,
-      customer, mode, note, orderNum,
+      customer, mode, note,
       payment: 'paypal', paymentStatus: 'pending',
-      paypalOrderId: ppOrder.id, status: 'awaiting_payment',
+      status: 'awaiting_payment',
       statusToken
     });
+    // Erst pruefen, dann PayPal fragen: eine ungueltige Bestellung soll nie eine
+    // PayPal-Zahlung ohne Gegenstueck in der Datenbank hinterlassen.
+    if (order.validateSync()) {
+      return res.status(400).json({ message: 'Die Bestellung ist unvollständig. Bitte lade die Seite neu und versuche es erneut.' });
+    }
+    const orderNum = await getNextOrderNum();
+    order.orderNum = orderNum;
+
+    let ppOrder, url;
+    try {
+      ppOrder = await paypalClient().bestellungAnlegen(
+        PaypalDirekt.bestellungFuerPaypal({ orderNum, total, statusToken, frontend: FRONTEND, laden: LADEN_NAME }),
+        `lascala-${orderNum}-${statusToken}`);
+      url = PaypalDirekt.freigabeLink(ppOrder);
+      if (!PaypalDirekt.istPaypalId(ppOrder.id) || !url) throw new Error('Antwort ohne Bestellnummer oder Freigabe-Link');
+    } catch (e) {
+      // Sofort neu pruefen. Nur wenn PayPal wirklich nicht (mehr) geht, verschwindet
+      // PayPal von der Seite; sonst darf der Gast es erneut versuchen.
+      console.error('PayPal-Bestellung konnte nicht angelegt werden:', e.message);
+      paypalPruefer.vergessen();
+      const nochBereit = await paypalBereit();
+      return res.status(503).json({
+        message: nochBereit
+          ? 'Die PayPal-Zahlung konnte nicht gestartet werden. Bitte versuche es erneut oder wähle eine andere Zahlungsart.'
+          : PAYPAL_AUS,
+        paypal: nochBereit,
+      });
+    }
+
+    order.paypalOrderId = ppOrder.id;
     await order.save();
-    res.json({ url: approve?.href, orderNum });
-  } catch(e) { console.error(e); res.status(500).json({ message: 'PayPal Fehler: '+e.message }); }
+    res.json({ url, orderNum });
+  } catch(e) { console.error(e); res.status(500).json({ message: 'Die PayPal-Zahlung konnte nicht gestartet werden. Bitte versuche es erneut.' }); }
 });
 
+// Datenbank-Seite des PayPal-Abgleichs (paypal-direkt.js). Beides atomar:
+//  einbuchen    - nur aus awaiting_payment; oder, wenn der Wachhund die Bestellung
+//                 gerade als nie bezahlt abgeschlossen hat, waehrend ein Einzug noch
+//                 lief (dann ist das Geld da und die Bestellung muss an die Kasse).
+//  abschliessen - nie bezahlt: cancelled wie eine abgelaufene Stripe-Zahlung (kein
+//                 Storno, keine Mail, paymentStatus bleibt pending -> weder Kasse
+//                 noch Umsatz noch Stornoliste, FUER_KASSE_PAYPAL).
+function paypalSpeicher({ nachgeholt = false } = {}) {
+  return {
+    async einbuchen(order, einzug) {
+      const setzen = { paymentStatus: 'paid', status: 'pending', paypalCaptureId: einzug.id, ...(nachgeholt ? { nachgeholt: true } : {}) };
+      const basis = { _id: order._id, payment: 'paypal', paypalOrderId: order.paypalOrderId };
+      const gebucht = await Order.findOneAndUpdate({ ...basis, status: 'awaiting_payment' },
+        { $set: setzen }, { new: true });
+      if (gebucht) { console.log(`✅ PayPal-Zahlung eingebucht: #${gebucht.orderNum}`); return gebucht; }
+      const zurueck = await Order.findOneAndUpdate(
+        { ...basis, status: 'cancelled', zahlungAbgelaufen: true, paymentStatus: 'pending' },
+        { $set: { ...setzen, nachgeholt: true }, $unset: { zahlungAbgelaufen: 1 } }, { new: true });
+      if (zurueck) {
+        console.error(`🚨 PayPal: #${zurueck.orderNum} war als nie bezahlt abgeschlossen, Einzug kam doch durch - jetzt auf pending`);
+        wachhundMelden([zurueck], { anbieter: 'PayPal' }).catch(e => console.error('Wachhund-Mail:', e.message));
+      }
+      return zurueck;
+    },
+    async abschliessen(order) {
+      const r = await Order.findOneAndUpdate({ _id: order._id, payment: 'paypal', status: 'awaiting_payment' },
+        { $set: { status: 'cancelled', zahlungAbgelaufen: true } }, { new: true });
+      return !!r;
+    },
+  };
+}
+const paypalBestellungFinden = id => Order.findOne({ paypalOrderId: String(id), payment: 'paypal' });
+
 // ── PayPal Capture (nach Rückkehr / Fallback) ─────────────────────
+// Zieht nur ein, solange die Bestellung auf awaiting_payment steht, und bucht nur ein,
+// wenn Betrag und Waehrung passen (paypal-direkt.js: rueckkehrVerarbeiten).
 app.post('/api/paypal-capture', async (req, res) => {
   try {
-    const paypalOrderId = req.body.paypalOrderId || req.body.token;
-    if (!paypalOrderId) return res.status(400).json({ ok: false, message: 'paypalOrderId fehlt' });
-
-    const order = await Order.findOne({ paypalOrderId });
-    if (!order) return res.status(404).json({ ok: false, message: 'Bestellung nicht gefunden' });
-
-    const token   = await getPaypalAccessToken();
-    const current = await paypalApi(`/v2/checkout/orders/${paypalOrderId}`, 'GET', token);
-
-    let captured;
-    if (current.status === 'COMPLETED') {
-      captured = current; // schon (z.B. per Webhook) eingezogen
-    } else if (current.status === 'APPROVED') {
-      captured = await paypalApi(`/v2/checkout/orders/${paypalOrderId}/capture`, 'POST', token, {});
-    } else {
-      return res.json({ ok: false, message: 'Noch nicht bezahlt' });
-    }
-
-    const captureId = captured?.purchase_units?.[0]?.payments?.captures?.[0]?.id;
-    if (order.status === 'awaiting_payment') {
-      order.paymentStatus = 'paid';
-      order.status = 'pending';
-      if (captureId) order.paypalCaptureId = captureId;
-      await order.save();
-      console.log(`✅ PayPal-Zahlung verifiziert: #${order.orderNum}`);
-    }
-    res.json({ ok: true, orderNum: order.orderNum });
+    const r = await PaypalDirekt.rueckkehrVerarbeiten({
+      body: req.body, env: process.env, finden: paypalBestellungFinden,
+      client: paypalClient(), speicher: paypalSpeicher() });
+    res.status(r.status).json(r.json);
   } catch(e) {
     console.error('paypal-capture Fehler:', e.message);
-    res.status(500).json({ ok: false, message: e.message });
+    res.status(500).json({ ok: false, message: 'Die Zahlung konnte gerade nicht bestätigt werden.' });
   }
 });
 
 // ── PayPal Webhook (Signatur per Verify-API → nutzt geparstes JSON) ─
+// Den Webhook (CHECKOUT.ORDER.APPROVED, PAYMENT.CAPTURE.COMPLETED) legt der Server selbst
+// in der PayPal-App an (paypalWebhook). Ohne bekannten Webhook oder ohne gueltige
+// Signatur wird nichts eingebucht. Scheitert die Signaturpruefung, sieht der Server
+// (hoechstens alle 10 Minuten) nach, ob es den gemerkten Webhook noch gibt.
 app.post('/api/paypal-webhook', async (req, res) => {
   try {
-    const token  = await getPaypalAccessToken();
-    const verify = await paypalApi('/v1/notifications/verify-webhook-signature', 'POST', token, {
-      auth_algo:         req.headers['paypal-auth-algo'],
-      cert_url:          req.headers['paypal-cert-url'],
-      transmission_id:   req.headers['paypal-transmission-id'],
-      transmission_sig:  req.headers['paypal-transmission-sig'],
-      transmission_time: req.headers['paypal-transmission-time'],
-      webhook_id:        process.env.PAYPAL_WEBHOOK_ID,
-      webhook_event:     req.body
-    });
-    if (verify.verification_status !== 'SUCCESS') {
-      console.warn('PayPal Webhook: ungültige Signatur');
-      return res.status(400).send('invalid signature');
-    }
-
-    const event = req.body;
-    if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
-      const captureId = event.resource?.id;
-      const ppOrderId = event.resource?.supplementary_data?.related_ids?.order_id;
-      const order = ppOrderId
-        ? await Order.findOne({ paypalOrderId: ppOrderId })
-        : await Order.findOne({ paypalCaptureId: captureId });
-      if (order && order.status === 'awaiting_payment') {
-        order.paymentStatus = 'paid';
-        order.status = 'pending';
-        if (captureId) order.paypalCaptureId = captureId;
-        await order.save();
-        console.log(`💳 Bezahlt (PayPal): #${order.orderNum} → wartet auf Bestätigung`);
-      }
-    }
-    res.json({ received: true });
+    paypalWebhook.anstossen();   // noch keiner bekannt: im Hintergrund sicherstellen
+    const r = await PaypalDirekt.webhookVerarbeiten({
+      env: process.env, webhookId: paypalWebhook.id(), beiSignaturFehler: paypalWebhook.verdachtMelden,
+      headers: req.headers, event: req.body,
+      client: paypalClient(), finden: paypalBestellungFinden, speicher: paypalSpeicher() });
+    res.status(r.status).json(r.json);
   } catch(e) {
     console.error('paypal-webhook Fehler:', e.message);
-    res.status(500).send('error');
+    res.status(500).json({ message: 'error' });
+  }
+});
+
+// ── PayPal-Zustand fuer den Betreiber (Admin) ────────────────────
+// GET /api/admin/paypal  (gleiche Anmeldung wie die anderen Admin-Routen)
+// Klartext ohne Geheimnisse: Schluessel gesetzt ja/nein, Modus live/aus, Probe-Anmeldung,
+// Webhook vorhanden samt Adresse, fuer Gaeste sichtbar ja/nein, naechster Schritt.
+// Stoesst das Sicherstellen des Webhooks an (wartet hoechstens 10 s); ?erneut=1 uebergeht
+// die Pause nach einem Fehlschlag und sieht in der PayPal-App nach (hoechstens alle 30 s).
+app.get('/api/admin/paypal', auth, async (req, res) => {
+  try {
+    const pk = PaypalDirekt.paypalKonfiguration(process.env);
+    let timer;
+    await Promise.race([
+      req.query.erneut === '1' ? paypalWebhook.sicherstellen({ erzwingen: true }) : paypalWebhook.anstossen(),
+      new Promise(r => { timer = setTimeout(r, 10000); }),
+    ]).finally(() => clearTimeout(timer));
+    if (pk.zugang) await paypalPruefer(pk.clientId);   // zwischengespeichert, hoechstens 4 s
+    const sichtbar = await paypalBereit();
+    res.set('Cache-Control', 'no-store');
+    res.json(PaypalDirekt.paypalStatus({ env: process.env, probe: pk.zugang ? paypalProbe : null,
+      webhook: paypalWebhook.zustand(), sichtbar }));
+  } catch (e) {
+    console.error('PayPal-Status:', e.message);
+    res.status(500).json({ message: 'PayPal-Zustand nicht lesbar' });
   }
 });
 
@@ -856,7 +974,7 @@ app.post('/api/admin/recover-stripe-orders', auth, async (_req, res) => {
 
 app.get('/api/admin/customers/:userId/orders', auth, async (req, res) => {
   try {
-    const orders = await Order.find({ userId: req.params.userId })
+    const orders = await Order.find({ ...FUER_KASSE_PAYPAL, userId: req.params.userId })
       .sort({ createdAt: -1 })
       .limit(50);
     res.json(orders);
@@ -870,7 +988,7 @@ app.get('/api/admin/customers', auth, async (req, res) => {
     const users = await User.find().select('-password').sort({ createdAt: -1 });
     const userIds = users.map(u => u._id);
     const stats = await Order.aggregate([
-      { $match: { userId: { $in: userIds } } },
+      { $match: { ...FUER_KASSE_PAYPAL, userId: { $in: userIds } } },
       { $group: { _id: '$userId', count: { $sum: 1 }, total: { $sum: '$total' }, lastOrder: { $max: '$createdAt' } } }
     ]);
     const statsMap = {};
@@ -942,7 +1060,7 @@ app.use('/api/admin/orders', kasseAnmerkung());
 
 // ── Pending Bestellungen (für 5s Polling) ───────────────────────
 app.get('/api/admin/orders/pending', auth, async (req, res) => {
-  try { res.json({ pending: await Order.find({ status:'pending' }).sort({ createdAt:1 }) }); }
+  try { res.json({ pending: await Order.find({ ...FUER_KASSE_PAYPAL, status:'pending' }).sort({ createdAt:1 }) }); }
   catch(e) { res.status(500).json({ message:'Fehler' }); }
 });
 
@@ -958,6 +1076,7 @@ app.get('/api/admin/orders', auth, async (req, res) => {
       const from = new Date(dateParam + 'T00:00:00+02:00');
       const to   = new Date(dateParam + 'T23:59:59+02:00');
       const orders = await Order.find({
+        ...FUER_KASSE_PAYPAL,
         status:    { $nin: ['pending', 'awaiting_payment'] },
         createdAt: { $gte: from, $lte: to }
       }).sort({ createdAt: -1 });
@@ -976,8 +1095,8 @@ app.get('/api/admin/orders', auth, async (req, res) => {
     }
 
     // ── Normalfall: heutige + laufende Bestellungen ──
-    const orders  = await Order.find({ status:{ $nin:['pending'] } }).sort({ createdAt:-1 }).limit(300);
-    const pending = await Order.find({ status:'pending' }).sort({ createdAt:1 });
+    const orders  = await Order.find({ ...FUER_KASSE_PAYPAL, status:{ $nin:['pending'] } }).sort({ createdAt:-1 }).limit(300);
+    const pending = await Order.find({ ...FUER_KASSE_PAYPAL, status:'pending' }).sort({ createdAt:1 });
     const today   = new Date(); today.setHours(0,0,0,0);
     const tod     = orders.filter(o => new Date(o.createdAt) >= today && o.status !== 'awaiting_payment');
     res.json({
@@ -1137,7 +1256,7 @@ app.patch('/api/admin/availability', auth, async (req, res) => {
 // ── Finanzübersicht ──────────────────────────────────────────────
 app.get('/api/admin/finance', auth, async (req, res) => {
   try {
-    const orders = await Order.find({ status:{ $in:['confirmed','preparing','ready','delivered'] } });
+    const orders = await Order.find({ ...FUER_KASSE_PAYPAL, status:{ $in:['confirmed','preparing','ready','delivered'] } });
     const today  = new Date(); today.setHours(0,0,0,0);
     const wStart = new Date(); wStart.setDate(wStart.getDate() - wStart.getDay() + 1); wStart.setHours(0,0,0,0);
     const calc = list => {
@@ -1402,9 +1521,38 @@ cron.schedule('*/5 * * * *', async () => {
   } catch (e) { console.error('Wachhund Fehler:', e.message); }
 });
 
+// ── PayPal: Wachhund und Aufraeumen (alle 5 Minuten) ─────────────
+// Gegenstueck zu Stripe-Wachhund und checkout.session.expired (paypal-direkt.js,
+// wachhundLauf): Bei PayPal bezahlt oder freigegeben, hier aber noch awaiting_payment
+// -> einziehen/einbuchen (nachgeholt, Alarm-Mail). Nie bezahlt -> nach einer Stunde
+// abgeschlossen wie eine abgelaufene Stripe-Zahlung. Ohne PayPal-Zugang wird nur nach
+// einem Tag abgeschlossen. Laeuft auch, wenn Stripe nicht eingerichtet ist. Fasst nur
+// payment 'paypal' an; der Stripe-Wachhund oben nur payment 'stripe'.
+cron.schedule('*/5 * * * *', async () => {
+  if (mongoose.connection.readyState !== 1) return;
+  try {
+    const F = PaypalDirekt.FRISTEN;
+    const offen = await Order.find({
+      status: 'awaiting_payment', payment: 'paypal',
+      createdAt: { $lt: new Date(Date.now() - F.wachhundMinuten * 60 * 1000),
+                   $gt: new Date(Date.now() - F.hoechstensTage * 24 * 3600 * 1000) },
+    }).sort({ createdAt: 1 }).limit(50);
+    if (!offen.length) return;
+    const client = PaypalDirekt.paypalKonfiguration(process.env).zugang ? paypalClient() : null;
+    const { nachgeholt } = await PaypalDirekt.wachhundLauf({
+      orders: offen, client, speicher: paypalSpeicher({ nachgeholt: true }) });
+    if (nachgeholt.length) await wachhundMelden(nachgeholt, { anbieter: 'PayPal' });
+  } catch (e) { console.error('PayPal-Wachhund Fehler:', e.message); }
+});
+
+// ── PayPal-Webhook sicherstellen (alle 5 Minuten, nur wenn faellig) ──
+// Holt einen gescheiterten Versuch nach Ablauf der Pause nach und bestaetigt den
+// gemerkten Webhook alle 12 Stunden. Ohne Schluessel oder ohne PAYPAL_ENV=live: nichts.
+cron.schedule('*/5 * * * *', () => { paypalWebhook.anstossen(); });
+
 // Die Meldung geht an beide: der Betreiber muss wissen, dass die Zahlkette
 // klemmt, und das Restaurant, dass ein Gast seit zehn Minuten wartet.
-async function wachhundMelden(bestellungen) {
+async function wachhundMelden(bestellungen, { anbieter = 'Stripe' } = {}) {
   const resend = getResend();
   if (!resend) { console.error('🚨 Wachhund: kein RESEND_API_KEY - Alarm bleibt ungesendet'); return; }
   const empfaenger = [process.env.OWNER_EMAIL, process.env.RESTAURANT_EMAIL].filter(Boolean);
@@ -1422,14 +1570,19 @@ async function wachhundMelden(bestellungen) {
     html: `<div style="font-family:Arial,sans-serif;max-width:560px;color:#222">
       <h2 style="font-size:18px;margin:0 0 8px">Bezahlt, aber nicht in der App angekommen</h2>
       <p style="margin:0 0 12px">Diese Bestellung${bestellungen.length > 1 ? 'en' : ''} stand${bestellungen.length > 1 ? 'en' : ''}
-      laenger als ${WACHHUND_MINUTEN} Minuten auf "wartet auf Zahlung", obwohl bei Stripe bezahlt wurde.
+      laenger als ${WACHHUND_MINUTEN} Minuten auf "wartet auf Zahlung", obwohl bei ${anbieter} bezahlt wurde.
       Sie wurde${bestellungen.length > 1 ? 'n' : ''} soeben nachgeholt und ist jetzt in der App sichtbar.</p>
       <table style="font-size:14px;border-collapse:collapse">${zeilen}</table>
-      <p style="margin:16px 0 0;font-size:13px;color:#666">
+      <p style="margin:16px 0 0;font-size:13px;color:#666">${anbieter === 'PayPal'
+        ? `Der Gast wartet entsprechend laenger. Weder die Rueckkehr des Gastes noch der PayPal-Webhook
+        hat die Zahlung gemeldet. Pruefen: PayPal-Zustand unter GET /api/admin/paypal (Webhook vorhanden?),
+        Webhook-Adresse ${PAYPAL_WEBHOOK_ADRESSE.url || API_BASIS + '/api/paypal-webhook'} in der PayPal-App des Ladens
+        mit den Ereignissen CHECKOUT.ORDER.APPROVED und PAYMENT.CAPTURE.COMPLETED.`
+        : `
         Der Gast wartet entsprechend laenger. Ursache ist fast immer der Stripe-Webhook:
         falsche Adresse, abgeschalteter Endpunkt oder ein Signaturgeheimnis, das mit
         <code>we_</code> statt <code>whsec_</code> beginnt. Pruefen mit
-        <code>zahlkette-pruefen.js</code> aus dem Betriebs-Skill.</p></div>`,
+        <code>zahlkette-pruefen.js</code> aus dem Betriebs-Skill.`}</p></div>`,
   });
   if (error) console.error('🚨 Wachhund: Alarm-Mail fehlgeschlagen:', error.message || error);
   else console.error(`🚨 Wachhund: Alarm an ${empfaenger.join(', ')} gesendet`);
@@ -1541,7 +1694,7 @@ function pdfKundenliste(doc, orders) {
   }
   drawGroup('Barzahlung', '#d32027', orders.filter(o => o.payment === 'bar'));
   drawGroup('Online-Zahlung (Stripe)', '#276749', orders.filter(o => o.payment === 'stripe'));
-  drawGroup('Online-Zahlung (PayPal)', '#003087', orders.filter(o => o.payment === 'paypal'));
+  drawGroup('PayPal (Ihr PayPal-Konto)', '#003087', orders.filter(o => o.payment === 'paypal'));
   drawGroup('EC-Karte', '#555555', orders.filter(o => o.payment === 'karte'));
 }
 
@@ -1602,18 +1755,27 @@ function pdfStornoliste(doc, alle) {
 // den Laden ueberwiesen, reicht das Online-Geld nicht, bleibt ein offener Betrag. Grundgebuehr und Domain fallen
 // monatlich an und stehen nur im Monatsbericht. Die Stripe-Gebuehr ist dieselbe Pauschale, die der Checkout je
 // Online-Zahlung einbehaelt (1,5 % + 0,25 €; am 01.11. fuer Dream Oktober in Stripe nachgeprueft, centgenau).
+// PayPal (Abed, 19.11.2026): eigene Gruppe "PayPal (Ihr PayPal-Konto)", nie unter Bar. Gerechnet wie bar: Das Geld
+// liegt auf dem PayPal-Konto des Ladens, FlueVate behaelt davon nichts ein, die Servicegebuehr dieser Bestellungen
+// steckt in svc (alle Bestellungen) und wird wie bei bar vom Stripe-Geld abgezogen bzw. ist offen. Ueberweisung und
+// offener Betrag rechnen deshalb nur aus umsatzOnline (Stripe). PayPal-Gebuehren kennt der Bericht nicht.
+// La Scala: keine Servicegebuehr (PDF_SV = 0), also faellt auch fuer PayPal-Bestellungen keine an - wie bei bar.
 const stripePauschale = o => Math.round(((o.total || 0) * 0.015 + 0.25) * 100) / 100;
 function berichtAbrechnung(orders, mitFixkosten) {
   const summe  = (liste, f) => Math.round(liste.reduce((s, o) => s + f(o), 0) * 100) / 100;
   const online = orders.filter(o => o.payment === 'stripe');
-  const laden  = orders.filter(o => o.payment !== 'stripe');
+  const paypal = orders.filter(o => o.payment === 'paypal');
+  const laden  = orders.filter(o => o.payment !== 'stripe' && o.payment !== 'paypal');
   const a = {
-    n: orders.length, nOnline: online.length, nLaden: laden.length,
+    n: orders.length, nOnline: online.length, nLaden: laden.length, nPaypal: paypal.length,
     umsatzOnline: summe(online, o => o.total || 0), umsatzLaden: summe(laden, o => o.total || 0),
+    umsatzPaypal: summe(paypal, o => o.total || 0),
     svc: summe(orders, o => o.serviceFee || PDF_SV), stripeGeb: summe(online, stripePauschale),
     grund: mitFixkosten ? PDF_BASE : 0, domain: mitFixkosten ? PDF_DOMAIN : 0,
   };
-  a.brutto    = a.umsatzOnline + a.umsatzLaden;
+  // Ohne PayPal dieselbe Rechnung wie bisher (Reihenfolge der Summanden unveraendert)
+  a.brutto    = a.nPaypal ? Math.round((a.umsatzOnline + a.umsatzLaden + a.umsatzPaypal) * 100) / 100
+                          : a.umsatzOnline + a.umsatzLaden;
   a.fluevate  = a.grund + a.domain + a.svc;
   a.gebuehren = a.fluevate + a.stripeGeb;
   a.bleibt    = a.brutto - a.gebuehren;
@@ -1641,6 +1803,7 @@ function pdfAbrechnung(doc, a) {
   block('UMSATZ');
   zeile(`Bar / EC-Karte  (${a.nLaden} Bestellungen)`, pdfFmt(a.umsatzLaden));
   if (a.nOnline) zeile(`Online über Stripe  (${a.nOnline} Bestellungen)`, pdfFmt(a.umsatzOnline));
+  if (a.nPaypal) zeile(`PayPal (Ihr PayPal-Konto)  (${a.nPaypal} Bestellungen)`, pdfFmt(a.umsatzPaypal));
   zeile('Gesamtumsatz', pdfFmt(a.brutto), true);
   block('GEBÜHREN FLUEVATE');
   if (a.grund)  zeile('Grundgebühr (monatlich)', pdfFmt(a.grund));
@@ -1655,6 +1818,10 @@ function pdfAbrechnung(doc, a) {
   if (a.offen) zeile('Offener Betrag  (wird eingezogen oder ist an FlueVate zu überweisen)', pdfFmt(a.offen), true);
   block('BAR / EC-KARTE – LIEGT IN IHRER KASSE');
   zeile(`${a.nLaden} Bestellungen`, pdfFmt(a.umsatzLaden), true);
+  if (a.nPaypal) {
+    block('PAYPAL (IHR PAYPAL-KONTO) – LIEGT AUF IHREM PAYPAL-KONTO');
+    zeile(`${a.nPaypal} Bestellungen  (PayPal-Gebühren nicht enthalten)`, pdfFmt(a.umsatzPaypal), true);
+  }
   doc.y += 8;
   const ay = doc.y;
   doc.rect(PDF_M, ay, PDF_W, 28).fill('#e8f5e9');
@@ -1662,7 +1829,8 @@ function pdfAbrechnung(doc, a) {
   doc.font('Helvetica-Bold').fontSize(13).fillColor('#2e7d32').text(pdfFmt(a.bleibt), PDF_M+2, ay+8, { width: PDF_W-4, align: 'right' });
   doc.y = ay + 28 + 3;
   doc.font('Helvetica').fontSize(7.5).fillColor('#888')
-    .text(a.offen ? `Kasse ${pdfFmt(a.umsatzLaden)} – offener Betrag ${pdfFmt(a.offen)}` : `Überweisung ${pdfFmt(a.ueberweisung)} + Kasse ${pdfFmt(a.umsatzLaden)}`, PDF_M+10, doc.y, { width: PDF_W-20 });
+    .text((a.offen ? `Kasse ${pdfFmt(a.umsatzLaden)} – offener Betrag ${pdfFmt(a.offen)}` : `Überweisung ${pdfFmt(a.ueberweisung)} + Kasse ${pdfFmt(a.umsatzLaden)}`)
+      + (a.nPaypal ? ` + PayPal ${pdfFmt(a.umsatzPaypal)} (vor PayPal-Gebühren)` : ''), PDF_M+10, doc.y, { width: PDF_W-20 });
   doc.y += 14;
 }
 
@@ -1677,6 +1845,7 @@ function abrechnungMailZeilen(a) {
     + `<tr style="background:#f5f5f5"><td ${td}><b>Überweisung an Sie über Stripe</b> (Online-Umsatz abzüglich Gebühren)</td><td ${tdr}><b>${eur(a.ueberweisung)}</b></td></tr>`
     + (a.offen ? `<tr><td ${td}><b>Offener Betrag</b> (wird eingezogen oder ist an FlueVate zu überweisen)</td><td ${tdr}><b>${eur(a.offen)}</b></td></tr>` : '')
     + `<tr><td ${td}>Bar / EC-Karte in Ihrer Kasse</td><td ${tdr}>${eur(a.umsatzLaden)}</td></tr>`
+    + (a.nPaypal ? `<tr><td ${td}>PayPal (Ihr PayPal-Konto, ${a.nPaypal} Bestellungen, PayPal-Gebühren nicht enthalten)</td><td ${tdr}>${eur(a.umsatzPaypal)}</td></tr>` : '')
     + `<tr style="background:#e8f5e9"><td style="padding:10px;font-weight:bold;color:#2e7d32;font-size:15px">Ihnen bleiben nach allen Gebühren</td><td style="padding:10px;text-align:right;font-weight:bold;color:#2e7d32;font-size:15px">${eur(a.bleibt)}</td></tr>`;
 }
 function abrechnungOwnerText(a) {
@@ -1686,7 +1855,8 @@ function abrechnungOwnerText(a) {
   return `<b>Gebühren FlueVate:</b> ${eur(a.fluevate)} (${teile})`
     + (a.nOnline ? `<br><b>Stripe-Gebühr:</b> ${eur(a.stripeGeb)} (${a.nOnline} Online-Zahlungen)` : '')
     + `<br><b>Überweisung an den Laden:</b> ${eur(a.ueberweisung)}`
-    + (a.offen ? `<br><b>Offener Betrag (einziehen):</b> ${eur(a.offen)}` : '');
+    + (a.offen ? `<br><b>Offener Betrag (einziehen):</b> ${eur(a.offen)}` : '')
+    + (a.nPaypal ? `<br><b>PayPal (Ihr PayPal-Konto):</b> ${eur(a.umsatzPaypal)} (${a.nPaypal} Bestellungen, liegt beim Laden)` : '');
 }
 
 function pdfBarRechnung(doc, barOrders, barStats, zeitraum) {
@@ -1827,7 +1997,7 @@ cron.schedule('0 22 * * *', async () => {
         const adresse  = o.mode==='lieferung'
           ? `${o.customer?.street||''} ${o.customer?.house||''}, ${o.customer?.city||''}`.trim()
           : 'Abholung';
-        const zahlung  = o.payment==='stripe'?'Kreditkarte':o.payment==='karte'?'EC-Karte':'Bar';
+        const zahlung  = o.payment==='stripe'?'Kreditkarte':o.payment==='paypal'?'PayPal':o.payment==='karte'?'EC-Karte':'Bar';
         const bezahlt  = o.paymentStatus==='paid'?'✓ Bezahlt':'✗ Offen';
         const items    = (o.items||[]).map(it=>{
           const extras = (it.extraDetails||[]).map(e=>e.name).filter(Boolean).join(', ');
@@ -2318,6 +2488,7 @@ app.get('/api/admin/history', auth, async (req, res) => {
     const padTo   = new Date(to   + 'T23:59:59Z'); padTo.setUTCDate(padTo.getUTCDate() + 1);
 
     const raw = await Order.find({
+      ...FUER_KASSE_PAYPAL,
       status:    { $nin: ['awaiting_payment'] },
       createdAt: { $gte: padFrom, $lte: padTo }
     }).sort({ createdAt: -1 }).limit(3000);

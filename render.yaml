@@ -41,14 +41,14 @@ services:
       - key: STRIPE_CONNECT_ACCOUNT
         sync: false
 
-      # ── PayPal ──
+      # ── PayPal (direkt auf das PayPal-Konto des Ladens, siehe paypal-direkt.js, Zustand: GET /api/admin/paypal) ──
+      # PAYPAL_ENV=live ist der bewusste Schalter und steht deshalb nicht fest hier.
+      # PAYPAL_WEBHOOK_ID ist nur noch eine Vorgabe von Hand (sonst legt der Server ihn an).
       - key: PAYPAL_ENV
-        value: live
+        sync: false
       - key: PAYPAL_CLIENT_ID
         sync: false
       - key: PAYPAL_CLIENT_SECRET
-        sync: false
-      - key: PAYPAL_WEBHOOK_ID
         sync: false
 
       # ── E-Mail (Resend) ──

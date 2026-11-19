@@ -116,7 +116,8 @@ function buildReceipt(order) {
   // Zahlung
   const payText = order.payment === 'bar'
     ? 'Barzahlung'
-    : order.payment === 'stripe' ? 'Kreditkarte (Stripe)' : 'EC-Karte';
+    : order.payment === 'stripe' ? 'Kreditkarte (Stripe)'
+    : order.payment === 'paypal' ? 'PayPal' : 'EC-Karte';
   receipt += `Zahlung: ${payText}` + LF;
   receipt += `Bezahlt: ${order.paymentStatus === 'paid' ? 'JA' : 'NEIN – bitte kassieren!'}` + LF;
 
